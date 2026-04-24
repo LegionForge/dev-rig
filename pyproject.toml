@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "legionforge-dev-rig"
+version = "0.1.0"
+description = "Shared CI/CD pipeline, pre-commit hooks, and test fixtures for LegionForge projects"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5",
+    "httpx>=0.27",
+    "respx>=0.21",          # async httpx mocking
+]
+
+[project.optional-dependencies]
+# Install in consuming projects: pip install legionforge-dev-rig[analysis]
+analysis = [
+    "ruff>=0.4",
+    "bandit[toml]>=1.7",
+    "mypy>=1.10",
+    "pip-audit>=2.7",
+    "semgrep>=1.70",
+    "pre-commit>=3.7",
+    "types-PyYAML",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "S", "B", "C4", "RUF"]
+ignore = [
+    "S603",   # subprocess call — shell=False enforced project-wide; reviewed
+    "S607",   # partial executable path — acceptable for system binaries
+]
+
+[tool.bandit]
+exclude_dirs = [".venv", "venv", ".git", "tests"]
+skips = [
+    "B404",   # subprocess import — shell=False enforced throughout
+    "B603",   # subprocess without shell=True
+    "B607",   # partial path — same rationale as ruff S607
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "raise NotImplementedError",
+]

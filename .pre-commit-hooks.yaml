@@ -1,0 +1,40 @@
+# Hook definitions for the LegionForge dev-rig.
+# Consumed by projects via .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/LegionForge/dev-rig
+#       rev: v0.1.0
+#       hooks:
+#         - id: ruff
+#         - id: ruff-format
+#         - id: bandit
+#         - id: mypy
+
+- id: ruff
+  name: Ruff lint
+  language: python
+  entry: ruff check --fix
+  types: [python]
+  require_serial: false
+
+- id: ruff-format
+  name: Ruff format
+  language: python
+  entry: ruff format
+  types: [python]
+  require_serial: false
+
+- id: bandit
+  name: Bandit security SAST
+  language: python
+  entry: bandit -c pyproject.toml
+  types: [python]
+  require_serial: false
+
+- id: mypy
+  name: mypy type check
+  language: python
+  entry: mypy
+  types: [python]
+  require_serial: true   # mypy needs the full file set
+  pass_filenames: false  # mypy resolves its own sources from args

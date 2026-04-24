@@ -1,0 +1,53 @@
+# Reusable workflow: lint + type check
+# Caller syntax:
+#
+#   jobs:
+#     lint:
+#       uses: LegionForge/dev-rig/.github/workflows/lint.yml@main
+#       with:
+#         source-dirs: "my_package svcmgr"
+#         python-version: "3.11"          # optional, defaults to 3.11
+
+name: Lint & Type Check
+
+on:
+  workflow_call:
+    inputs:
+      source-dirs:
+        description: "Space-separated source directories to analyse"
+        required: true
+        type: string
+      python-version:
+        description: "Python version to use"
+        required: false
+        type: string
+        default: "3.11"
+      extra-mypy-deps:
+        description: "Space-separated extra packages for mypy stubs"
+        required: false
+        type: string
+        default: "types-PyYAML"
+
+jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -e ".[dev]" ${{ inputs.extra-mypy-deps }}
+
+      - name: Ruff
+        run: python -m ruff check ${{ inputs.source-dirs }}
+
+      - name: Bandit
+        run: python -m bandit -r ${{ inputs.source-dirs }} -c pyproject.toml
+
+      - name: mypy
+        run: python -m mypy ${{ inputs.source-dirs }}

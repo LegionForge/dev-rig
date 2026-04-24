@@ -1,0 +1,42 @@
+# Reusable workflow: pip-audit dependency CVE scan
+# Caller syntax:
+#
+#   jobs:
+#     audit:
+#       uses: LegionForge/dev-rig/.github/workflows/audit.yml@main
+
+name: Dependency Audit
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: "Python version to use"
+        required: false
+        type: string
+        default: "3.11"
+
+jobs:
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+
+      - name: Install project (runtime deps only — keep audit clean)
+        run: pip install -e "."
+
+      - name: pip-audit (CVE scan)
+        run: |
+          pip install pip-audit
+          python -m pip_audit
+
+      - name: pip-licenses (license compliance — OWASP SAMM Operations)
+        run: |
+          pip install pip-licenses
+          pip-licenses --format=markdown --with-urls --order=license --fail-on="GPL;AGPL"

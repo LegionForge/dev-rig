@@ -1,0 +1,64 @@
+# Reusable workflow: pytest with coverage
+# Caller syntax:
+#
+#   jobs:
+#     test:
+#       uses: LegionForge/dev-rig/.github/workflows/test.yml@main
+#       with:
+#         coverage-source: "my_package"
+#         coverage-threshold: 80
+
+name: Tests & Coverage
+
+on:
+  workflow_call:
+    inputs:
+      coverage-source:
+        description: "Package to measure coverage against"
+        required: true
+        type: string
+      coverage-threshold:
+        description: "Minimum coverage percentage (fail below this)"
+        required: false
+        type: number
+        default: 80
+      python-version:
+        description: "Python version to use"
+        required: false
+        type: string
+        default: "3.11"
+      extra-deps:
+        description: "Space-separated extra packages to install"
+        required: false
+        type: string
+        default: "types-PyYAML"
+
+jobs:
+  test:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+
+      - name: Install dev dependencies
+        run: pip install -e ".[dev]" ${{ inputs.extra-deps }}
+
+      - name: pytest with coverage
+        run: |
+          python -m pytest \
+            --cov=${{ inputs.coverage-source }} \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=${{ inputs.coverage-threshold }}
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-xml
+          path: coverage.xml

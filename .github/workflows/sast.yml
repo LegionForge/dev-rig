@@ -1,0 +1,72 @@
+# Reusable workflow: semgrep + CodeQL
+# Caller syntax:
+#
+#   jobs:
+#     sast:
+#       uses: LegionForge/dev-rig/.github/workflows/sast.yml@main
+#       with:
+#         source-dirs: "my_package/"
+#       permissions:
+#         security-events: write
+
+name: SAST
+
+on:
+  workflow_call:
+    inputs:
+      source-dirs:
+        description: "Space-separated source directories for semgrep"
+        required: true
+        type: string
+      semgrep-configs:
+        description: "Space-separated semgrep config targets"
+        required: false
+        type: string
+        default: "p/python p/fastapi"
+      python-version:
+        description: "Python version to use"
+        required: false
+        type: string
+        default: "3.11"
+
+jobs:
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install semgrep
+        run: pip install semgrep
+
+      - name: Semgrep scan
+        run: |
+          configs=""
+          for c in ${{ inputs.semgrep-configs }}; do
+            configs="$configs --config=$c"
+          done
+          semgrep $configs ${{ inputs.source-dirs }} --error
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-extended
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
