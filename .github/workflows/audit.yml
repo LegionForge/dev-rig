@@ -4,6 +4,8 @@
 #   jobs:
 #     audit:
 #       uses: LegionForge/dev-rig/.github/workflows/audit.yml@main
+#       with:
+#         ignore-vulns: "CVE-2026-1234 CVE-2026-5678"   # optional
 
 name: Dependency Audit
 
@@ -15,6 +17,11 @@ on:
         required: false
         type: string
         default: "3.11"
+      ignore-vulns:
+        description: "Space-separated CVE IDs to suppress (e.g. CVE-2026-1234)"
+        required: false
+        type: string
+        default: ""
 
 jobs:
   audit:
@@ -34,7 +41,11 @@ jobs:
       - name: pip-audit (CVE scan)
         run: |
           pip install pip-audit
-          python -m pip_audit
+          IGNORE_FLAGS=""
+          for vuln in ${{ inputs.ignore-vulns }}; do
+            IGNORE_FLAGS="$IGNORE_FLAGS --ignore-vuln $vuln"
+          done
+          python -m pip_audit $IGNORE_FLAGS
 
       - name: pip-licenses (license compliance — OWASP SAMM Operations)
         run: |
