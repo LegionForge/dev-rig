@@ -37,7 +37,7 @@ jobs:
       - name: Generate SBOM (CycloneDX JSON)
         run: |
           pip install cyclonedx-bom
-          cyclonedx-py environment --output-format json --outfile sbom.json
+          cyclonedx-py environment --output-format json > sbom.json
           echo "=== SBOM summary ==="
           python -c "
           import json, sys
