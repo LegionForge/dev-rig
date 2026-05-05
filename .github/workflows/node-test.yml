@@ -1,23 +1,20 @@
 # Reusable workflow: tests + coverage enforcement (Node/TypeScript)
 #
-# Works with vitest, jest, or any test runner that:
-#   - is invoked via an npm script
-#   - exits non-zero when coverage falls below threshold
+# Works with vitest, jest, or any runner that exits non-zero on coverage failure.
+# Coverage threshold is enforced by the project's own runner config:
+#   vitest.config.ts → coverage.thresholds
+#   jest.config      → coverageThreshold
+# The threshold input is passed as COVERAGE_THRESHOLD env var for configs that read it.
 #
-# Standard LegionForge npm scripts expected:
+# Standard LegionForge npm script expected:
 #   "test:coverage": "vitest run --coverage"   (vitest)
 #   "test:coverage": "jest --coverage"         (jest)
-#
-# Coverage threshold is enforced by the test runner's own config
-# (vitest.config.ts → coverage.thresholds, jest.config → coverageThreshold).
-# The threshold input here is passed as an env var so configs can read it
-# if they choose — it is NOT enforced by this workflow directly.
 #
 # Caller syntax:
 #
 #   jobs:
 #     test:
-#       uses: LegionForge/dev-rig/.github/workflows/node/test.yml@main
+#       uses: LegionForge/dev-rig/.github/workflows/node-test.yml@main
 #       with:
 #         coverage-threshold: 80
 

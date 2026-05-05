@@ -7,7 +7,7 @@
 #
 #   jobs:
 #     sast:
-#       uses: LegionForge/dev-rig/.github/workflows/node/sast.yml@main
+#       uses: LegionForge/dev-rig/.github/workflows/node-sast.yml@main
 #       with:
 #         source-dirs: "src"
 #       permissions:

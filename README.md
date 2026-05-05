@@ -21,18 +21,17 @@ Supports Python and Node/TypeScript. Rust and C planned.
 
 | Path | Purpose |
 |---|---|
-| `.github/workflows/node/lint.yml` | tsc --noEmit + eslint (skipped if unconfigured) |
-| `.github/workflows/node/test.yml` | vitest/jest + coverage upload |
-| `.github/workflows/node/sast.yml` | semgrep (p/javascript p/typescript p/nodejs) + CodeQL |
-| `.github/workflows/node/audit.yml` | npm audit CVE scan + license-checker compliance |
-| `.github/workflows/node/sbom.yml` | CycloneDX SBOM generation |
+| `.github/workflows/node-lint.yml` | tsc --noEmit + eslint (skipped if unconfigured) |
+| `.github/workflows/node-test.yml` | vitest/jest + coverage upload |
+| `.github/workflows/node-sast.yml` | semgrep (p/javascript p/typescript p/nodejs) + CodeQL |
+| `.github/workflows/node-audit.yml` | npm audit CVE scan + license-checker compliance |
+| `.github/workflows/node-sbom.yml` | CycloneDX SBOM generation |
 
-### Common (language-agnostic)
+### Language-agnostic
 
 | Path | Purpose |
 |---|---|
-| `.github/workflows/common/secrets.yml` | gitleaks secret scanning — works for any language |
-| `.github/workflows/secrets.yml` | Backward-compat shim → calls `common/secrets.yml` |
+| `.github/workflows/secrets.yml` | gitleaks secret scanning — works for any language |
 
 ### Other
 
@@ -117,7 +116,7 @@ jobs:
     uses: LegionForge/dev-rig/.github/workflows/audit.yml@main
 
   secrets:
-    uses: LegionForge/dev-rig/.github/workflows/common/secrets.yml@main
+    uses: LegionForge/dev-rig/.github/workflows/secrets.yml@main
 ```
 
 ### 4 — Add shared fixtures to tests/conftest.py
@@ -147,7 +146,7 @@ dev-rig calls these script names directly. Add them to `package.json`:
 }
 ```
 
-ESLint is optional — `node/lint.yml` skips it if no ESLint config file is present.
+ESLint is optional — `node-lint.yml` skips it if no ESLint config file is present.
 When you add ESLint, install `eslint` + `@typescript-eslint/eslint-plugin` +
 `@typescript-eslint/parser` in devDependencies and add `eslint.config.js`.
 
@@ -168,27 +167,27 @@ on:
 
 jobs:
   lint:
-    uses: LegionForge/dev-rig/.github/workflows/node/lint.yml@main
+    uses: LegionForge/dev-rig/.github/workflows/node-lint.yml@main
     with:
       source-dirs: "src"
 
   test:
-    uses: LegionForge/dev-rig/.github/workflows/node/test.yml@main
+    uses: LegionForge/dev-rig/.github/workflows/node-test.yml@main
     with:
       coverage-threshold: 80
 
   sast:
-    uses: LegionForge/dev-rig/.github/workflows/node/sast.yml@main
+    uses: LegionForge/dev-rig/.github/workflows/node-sast.yml@main
     with:
       source-dirs: "src"
     permissions:
       security-events: write
 
   audit:
-    uses: LegionForge/dev-rig/.github/workflows/node/audit.yml@main
+    uses: LegionForge/dev-rig/.github/workflows/node-audit.yml@main
 
   secrets:
-    uses: LegionForge/dev-rig/.github/workflows/common/secrets.yml@main
+    uses: LegionForge/dev-rig/.github/workflows/secrets.yml@main
 ```
 
 ---

@@ -7,7 +7,7 @@
 #
 #   jobs:
 #     audit:
-#       uses: LegionForge/dev-rig/.github/workflows/node/audit.yml@main
+#       uses: LegionForge/dev-rig/.github/workflows/node-audit.yml@main
 #       with:
 #         audit-level: "high"
 
