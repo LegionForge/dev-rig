@@ -1,0 +1,73 @@
+# Reusable workflow: SAST — semgrep + CodeQL (Node/TypeScript)
+#
+# semgrep: scans JS/TS source with p/javascript, p/typescript, p/nodejs rulesets.
+# CodeQL:  GitHub's semantic analysis engine with security-extended queries.
+#
+# Caller syntax:
+#
+#   jobs:
+#     sast:
+#       uses: LegionForge/dev-rig/.github/workflows/node/sast.yml@main
+#       with:
+#         source-dirs: "src"
+#       permissions:
+#         security-events: write
+
+name: SAST (Node)
+
+on:
+  workflow_call:
+    inputs:
+      source-dirs:
+        description: "Space-separated source directories for semgrep"
+        required: false
+        type: string
+        default: "src"
+      semgrep-configs:
+        description: "Space-separated semgrep config targets"
+        required: false
+        type: string
+        default: "p/javascript p/typescript p/nodejs"
+
+jobs:
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # semgrep is a Python tool — install via pip on a fixed Python version
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install semgrep
+        run: pip install semgrep
+
+      - name: Semgrep scan
+        run: |
+          configs=""
+          for c in ${{ inputs.semgrep-configs }}; do
+            configs="$configs --config=$c"
+          done
+          semgrep $configs ${{ inputs.source-dirs }} --error
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3

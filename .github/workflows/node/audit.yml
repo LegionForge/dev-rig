@@ -1,0 +1,58 @@
+# Reusable workflow: dependency CVE scan + license compliance (Node/TypeScript)
+#
+# npm audit: flags known CVEs at or above the specified severity level.
+# license-checker: fails if any dependency uses a license not in the allowlist.
+#
+# Caller syntax:
+#
+#   jobs:
+#     audit:
+#       uses: LegionForge/dev-rig/.github/workflows/node/audit.yml@main
+#       with:
+#         audit-level: "high"
+
+name: Dependency Audit (Node)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "20"
+      audit-level:
+        description: "Minimum severity to fail on (critical, high, moderate, low)"
+        required: false
+        type: string
+        default: "high"
+      license-allowlist:
+        description: "Semicolon-separated SPDX license IDs to permit"
+        required: false
+        type: string
+        default: "MIT;ISC;BSD-2-Clause;BSD-3-Clause;Apache-2.0;0BSD;CC0-1.0;CC-BY-3.0;CC-BY-4.0;Unlicense;BlueOak-1.0.0;Python-2.0"
+
+jobs:
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: npm audit (CVE scan)
+        run: npm audit --audit-level=${{ inputs.audit-level }}
+
+      - name: License compliance
+        run: |
+          npx license-checker \
+            --onlyAllow "${{ inputs.license-allowlist }}" \
+            --excludePrivatePackages \
+            --summary
