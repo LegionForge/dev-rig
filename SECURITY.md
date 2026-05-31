@@ -11,7 +11,7 @@
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Report security issues to: jp@legionforge.org
+Report security issues to: security@legionforge.org
 
 Include in your report:
 - Description of the vulnerability
