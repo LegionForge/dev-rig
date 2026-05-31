@@ -233,3 +233,124 @@ pre-commit autoupdate
 | @vitest/coverage-v8 | 2 | `vitest.config.ts coverage.*` |
 | license-checker | 25 | no config — allowlist passed as CLI arg |
 | @cyclonedx/cyclonedx-npm | 1 | no config |
+
+---
+
+## OWASP Coverage
+
+dev-rig provides multi-layered security testing aligned with OWASP SAMM maturity practices and OWASP Top 10 vulnerability categories:
+
+### SAST (Static Application Security Testing)
+
+| Tool | Workflow | OWASP Coverage |
+|------|----------|---|
+| Semgrep (p/python) | `lint.yml` | A01 (Broken Access Control—partial), A02 (Cryptographic Failures), A03 (Injection—SQL/CMD/SSTI), A05 (Security Misconfiguration), A08 (Software/Data Integrity) |
+| Semgrep (p/fastapi) | `lint.yml` | A01 (CORS/Auth misconfiguration), A07 (Identification/Authentication Failures), A02 (JWT issues) |
+| CodeQL (security-extended) | `sast.yml` | A03 (Injection—taint-flow), A10 (SSRF), A01 (Access Control—partial) |
+| Bandit | `lint.yml` | A02 (Cryptographic Failures), A06 (Vulnerable Components), A08 (Integrity) |
+
+### Dependency Audit
+
+| Tool | Workflow | OWASP Coverage |
+|------|----------|---|
+| pip-audit | `audit.yml` | A06 (Vulnerable and Outdated Components) |
+| pip-licenses | `audit.yml` | A06 (License compliance—supply chain risk) |
+
+### Secret Scanning
+
+| Tool | Workflow | OWASP Coverage |
+|------|----------|---|
+| gitleaks | `secrets.yml` | A02 (Cryptographic Failures—leaked credentials/keys) |
+
+### Dynamic Application Security Testing (DAST)
+
+| Tool | Workflow | OWASP Coverage |
+|------|----------|---|
+| OWASP ZAP | `dast.yml` | A01 (Auth enforcement at runtime), A05 (Missing security headers), A06 (Session/token lifecycle), A09 (Logging/Monitoring—response leakage) |
+
+### Coverage Gaps: What SAST Alone Cannot Verify
+
+SAST tools (semgrep, CodeQL, bandit) analyze source code and can detect injection patterns, weak crypto, hardcoded secrets, and dependency vulnerabilities. However, they **cannot test behavior at runtime**:
+
+- **Authentication enforcement** — whether `/login` actually rejects bad credentials, whether protected endpoints block unauthenticated requests
+- **HTTP security headers** — `X-Content-Type-Options`, `Content-Security-Policy`, `Strict-Transport-Security`, etc. (not added by most frameworks by default)
+- **Session/token lifecycle** — expiration, token refresh, session fixation
+- **Information disclosure in error responses** — whether 500 errors leak stack traces or internal paths
+- **Rate limiting and DoS prevention** — not visible in code analysis
+
+**DAST bridges this gap** by running the application and probing it against real HTTP requests.
+
+### Recommended CI Configuration for Web Services
+
+For FastAPI, Django, Flask, Node.js/Express, and other web services, integrate both SAST and DAST:
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    uses: LegionForge/dev-rig/.github/workflows/lint.yml@main
+    with:
+      source-dirs: "src"
+
+  test:
+    uses: LegionForge/dev-rig/.github/workflows/test.yml@main
+    with:
+      coverage-source: "src"
+      coverage-threshold: 80
+
+  sast:
+    uses: LegionForge/dev-rig/.github/workflows/sast.yml@main
+    with:
+      source-dirs: "src"
+    permissions:
+      security-events: write
+
+  audit:
+    uses: LegionForge/dev-rig/.github/workflows/audit.yml@main
+
+  secrets:
+    uses: LegionForge/dev-rig/.github/workflows/secrets.yml@main
+
+  dast:
+    needs: [test]  # Only run DAST after unit tests pass
+    uses: LegionForge/dev-rig/.github/workflows/dast.yml@main
+    with:
+      target-url: "http://localhost:9766"
+      fail-on-severity: "High"
+    permissions:
+      security-events: write
+```
+
+**Important:** The `dast.yml` workflow **does not start your service**. The caller workflow (in your repo) is responsible for:
+
+1. Spinning up the service in Docker Compose or Kubernetes
+2. Polling `/health` or equivalent until the service is ready
+3. Invoking `dast.yml` with the target URL
+4. Cleaning up containers/processes after scan completes
+
+See `LegionForge/LegionForge-Guardian/.github/workflows/dast.yml` for a complete example.
+
+---
+
+## OWASP Top 10 Quick Reference
+
+| Category | What it is | dev-rig Coverage |
+|---|---|---|
+| A01: Broken Access Control | Auth/authz failures, CORS issues, privilege escalation | SAST (semgrep/CodeQL) + DAST (ZAP) |
+| A02: Cryptographic Failures | Weak crypto, hardcoded secrets, TLS issues | SAST (semgrep/bandit) + Audit (gitleaks) |
+| A03: Injection | SQL, command, LDAP, template injection | SAST (semgrep/CodeQL—taint-flow) |
+| A04: Insecure Design | Missing controls by design (no auth model, etc.) | **Not covered — requires threat modeling** |
+| A05: Security Misconfiguration | Missing headers, exposed services, bad defaults | SAST (semgrep p/fastapi) + DAST (ZAP headers) |
+| A06: Vulnerable Components | Known CVEs in dependencies | Audit (pip-audit) |
+| A07: Authentication Failures | Weak password policy, session fixation | SAST (semgrep p/fastapi) + DAST (ZAP) |
+| A08: Data Integrity Failures | Serialization bugs, unsigned updates | SAST (semgrep/CodeQL) |
+| A09: Logging/Monitoring Failures | Missing logs, response leakage | DAST (ZAP scans for info disclosure) |
+| A10: SSRF | Server-side request forgery | SAST (CodeQL—taint tracking) |

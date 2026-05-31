@@ -1,0 +1,116 @@
+# Reusable workflow: OWASP ZAP Dynamic Application Security Testing
+#
+# DAST scans a running web service against OWASP Top 10 vulnerabilities.
+# The caller (e.g., Guardian's CI) is responsible for:
+#   1. Starting the service (docker compose up, etc.)
+#   2. Polling /health or equivalent until ready
+#   3. Invoking this workflow with the target URL
+#   4. Stopping/cleaning up after scan completes
+#
+# Caller syntax:
+#
+#   jobs:
+#     dast:
+#       needs: [test]  # Wait for unit tests
+#       uses: LegionForge/dev-rig/.github/workflows/dast.yml@main
+#       with:
+#         target-url: "http://localhost:9766"
+#         fail-on-severity: "High"
+#       permissions:
+#         security-events: write
+
+name: DAST
+
+on:
+  workflow_call:
+    inputs:
+      target-url:
+        description: "URL of the running service to scan (e.g., http://localhost:9766)"
+        required: true
+        type: string
+      fail-on-severity:
+        description: "Minimum severity to fail on: None, Low, Medium, High"
+        required: false
+        type: string
+        default: "High"
+      zap-version:
+        description: "OWASP ZAP Docker image tag (e.g., stable, weekly, latest)"
+        required: false
+        type: string
+        default: "stable"
+
+jobs:
+  zap-baseline:
+    name: OWASP ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OWASP ZAP Baseline Scan
+        run: |
+          docker run --rm \
+            -v $(pwd):/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:${{ inputs.zap-version }} \
+            zap-baseline.py \
+              -t "${{ inputs.target-url }}" \
+              -r zap-report.html \
+              -J zap-report.sarif
+        continue-on-error: true
+
+      - name: Parse ZAP Results
+        id: zap-parse
+        run: |
+          if [ -f zap-report.sarif ]; then
+            high_count=$(jq '[.runs[0].results[] | select(.level=="error")] | length' zap-report.sarif 2>/dev/null || echo "0")
+            medium_count=$(jq '[.runs[0].results[] | select(.level=="warning")] | length' zap-report.sarif 2>/dev/null || echo "0")
+            low_count=$(jq '[.runs[0].results[] | select(.level=="note")] | length' zap-report.sarif 2>/dev/null || echo "0")
+          else
+            high_count=0
+            medium_count=0
+            low_count=0
+          fi
+          echo "HIGH=$high_count" >> $GITHUB_OUTPUT
+          echo "MEDIUM=$medium_count" >> $GITHUB_OUTPUT
+          echo "LOW=$low_count" >> $GITHUB_OUTPUT
+
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('zap-report.sarif') != ''
+        with:
+          sarif_file: zap-report.sarif
+          category: "owasp-zap"
+
+      - name: Upload ZAP HTML Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-report-html
+          path: zap-report.html
+          retention-days: 90
+
+      - name: Fail on Severity Threshold
+        run: |
+          FAIL_THRESHOLD="${{ inputs.fail-on-severity }}"
+          HIGH_COUNT=${{ steps.zap-parse.outputs.HIGH }}
+          MEDIUM_COUNT=${{ steps.zap-parse.outputs.MEDIUM }}
+
+          case "$FAIL_THRESHOLD" in
+            None)
+              exit 0
+              ;;
+            Low)
+              exit $(($HIGH_COUNT + $MEDIUM_COUNT + ${{ steps.zap-parse.outputs.LOW }}))
+              ;;
+            Medium)
+              exit $(($HIGH_COUNT + $MEDIUM_COUNT))
+              ;;
+            High)
+              exit $HIGH_COUNT
+              ;;
+            *)
+              echo "Unknown fail-on-severity: $FAIL_THRESHOLD"
+              exit 1
+              ;;
+          esac
