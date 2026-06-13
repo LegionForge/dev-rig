@@ -1,0 +1,42 @@
+# Reusable workflow: cargo audit (CVE scan via RustSec Advisory Database)
+# Caller syntax:
+#
+#   jobs:
+#     audit:
+#       uses: LegionForge/dev-rig/.github/workflows/rust-audit.yml@main
+#       with:
+#         ignore-advisories: "RUSTSEC-2026-1234 RUSTSEC-2026-5678"   # optional
+
+name: Rust Dependency Audit
+
+on:
+  workflow_call:
+    inputs:
+      ignore-advisories:
+        description: "Space-separated RustSec advisory IDs to suppress"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  cargo-audit:
+    name: Cargo Audit (CVE scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: cargo audit
+        run: |
+          IGNORE_FLAGS=""
+          for id in ${{ inputs.ignore-advisories }}; do
+            IGNORE_FLAGS="$IGNORE_FLAGS --ignore $id"
+          done
+          cargo audit $IGNORE_FLAGS
