@@ -1,0 +1,74 @@
+# Reusable workflow: Trivy vulnerability + IaC misconfiguration scan
+#
+# Scans the repository filesystem for:
+#   - OS/language package vulnerabilities
+#   - Dockerfile and docker-compose misconfigurations
+#   - Exposed secrets
+#
+# Results are uploaded to the GitHub Security tab as SARIF.
+#
+# Caller syntax:
+#
+#   jobs:
+#     trivy:
+#       uses: LegionForge/dev-rig/.github/workflows/trivy.yml@main
+#       permissions:
+#         security-events: write
+#         contents: read
+
+name: Trivy Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      severity:
+        description: "Comma-separated severity levels to report (CRITICAL,HIGH,MEDIUM,LOW)"
+        required: false
+        type: string
+        default: "CRITICAL,HIGH"
+      exit-code:
+        description: "Exit code when vulnerabilities found: 0 = report only, 1 = fail build"
+        required: false
+        type: string
+        default: "0"
+      trivy-version:
+        description: "aquasecurity/trivy-action version tag"
+        required: false
+        type: string
+        default: "master"
+
+jobs:
+  trivy:
+    name: Trivy Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: "."
+          format: sarif
+          output: trivy-results.sarif
+          severity: ${{ inputs.severity }}
+          exit-code: ${{ inputs.exit-code }}
+          scanners: vuln,misconfig,secret
+
+      - name: Upload Trivy SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs
+
+      - name: Upload Trivy report artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-report
+          path: trivy-results.sarif
+          retention-days: 90
