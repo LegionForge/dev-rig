@@ -32,7 +32,7 @@ jobs:
 
       - name: Generate SBOM (CycloneDX JSON)
         run: |
-          cargo cyclonedx --format json --output-pattern prefix
+          cargo cyclonedx --format json
           echo "=== SBOM summary ==="
           SBOM=$(ls *.cdx.json 2>/dev/null | head -1)
           if [ -n "$SBOM" ]; then
