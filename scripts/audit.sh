@@ -113,7 +113,8 @@ fi
 shell_files=()
 while IFS= read -r f; do shell_files+=("$f"); done < <(
     find "$PROJECT" -type f \( -name '*.sh' -o -name '*.bash' \) \
-        -not -path '*/.git/*' -not -path '*/.venv/*' -not -path '*/node_modules/*' 2>/dev/null
+        -not -path '*/.git/*' -not -path '*/.venv/*' -not -path '*/node_modules/*' \
+        -not -path '*/.claude/*' 2>/dev/null
 )
 if [[ ${#shell_files[@]} -gt 0 ]]; then
     if command -v shellcheck > /dev/null 2>&1; then
@@ -156,7 +157,8 @@ if [[ -f "$RISKY_RULES" ]]; then
         -v "${WIN_PROJECT}:/src" \
         -v "${WIN_RIG_SEMGREP}:/rules:ro" \
         semgrep/semgrep \
-        semgrep --config /rules/legionforge-risky-exec.yml /src --error
+        semgrep --config /rules/legionforge-risky-exec.yml /src --error \
+        --exclude .claude --exclude .git --exclude node_modules --exclude semgrep
 fi
 
 # ── Summary ───────────────────────────────────────────────────────────────────

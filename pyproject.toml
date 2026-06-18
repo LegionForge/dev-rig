@@ -28,6 +28,18 @@ analysis = [
     "pre-commit>=3.7",
     "types-PyYAML",
 ]
+# The `dev` extra is the contract the reusable lint.yml / test.yml workflows
+# install (`pip install -e .[dev]`). Consuming projects provide their own; the
+# rig defines one so it can self-test those workflows (see ci.yml).
+dev = [
+    "ruff>=0.4",
+    "bandit[toml]>=1.7",
+    "mypy>=1.10",
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5",
+    "types-PyYAML",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -42,6 +54,11 @@ ignore = [
     "S603",   # subprocess call — shell=False enforced project-wide; reviewed
     "S607",   # partial executable path — acceptable for system binaries
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests and examples legitimately use `assert` (S101) for verification.
+"tests/**" = ["S101"]
+"examples/**" = ["S101"]
 
 [tool.bandit]
 exclude_dirs = [".venv", "venv", ".git", "tests"]

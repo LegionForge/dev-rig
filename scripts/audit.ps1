@@ -146,7 +146,7 @@ if (Get-Command osv-scanner -ErrorAction SilentlyContinue) {
 # Runs only when the repo contains shell scripts.
 
 $shellFiles = Get-ChildItem -Path $ProjectPath -Recurse -File -Include *.sh, *.bash -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -notmatch '[\\/](\.git|\.venv|node_modules)[\\/]' }
+    Where-Object { $_.FullName -notmatch '[\\/](\.git|\.venv|node_modules|\.claude)[\\/]' }
 if ($shellFiles) {
     if (Get-Command shellcheck -ErrorAction SilentlyContinue) {
         Invoke-Tool "shellcheck" {
@@ -193,7 +193,8 @@ if (Test-Path $riskyRules) {
             -v "${ProjectPath}:/src" `
             -v "${rigSemgrep}:/rules:ro" `
             semgrep/semgrep `
-            semgrep --config /rules/legionforge-risky-exec.yml /src --error
+            semgrep --config /rules/legionforge-risky-exec.yml /src --error `
+            --exclude .claude --exclude .git --exclude node_modules --exclude semgrep
     }
 }
 
