@@ -1,0 +1,120 @@
+# LegionForge custom Semgrep ruleset — risky execution / supply-chain patterns.
+#
+# Targets the install-time and remote-code-execution patterns that ecosystem
+# scanners (osv-scanner, pip-audit) do NOT catch: curl|bash installers,
+# PowerShell download-cradles, decode-and-exec, and TLS-verification bypasses.
+#
+# Scope: shell (.sh/.bash), PowerShell (.ps1/.psm1), and CI YAML, matched in
+# Semgrep "generic" mode so a single ruleset spans every file type.
+#
+# Run:
+#   semgrep --config semgrep/legionforge-risky-exec.yml --error <path>
+# Wired into scripts/audit.sh and .github/workflows/supply-chain.yml.
+
+rules:
+  # ── Remote pipe-to-shell ─────────────────────────────────────────────────────
+  - id: lf-remote-pipe-to-shell
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Remote content piped directly into a shell (curl|wget ... | sh/bash).
+      The downloaded script runs with no review, no pinning, and no integrity
+      check — a single compromised host or MITM yields code execution.
+      Download to a file, verify a checksum/signature, then execute.
+    paths:
+      include: ["*.sh", "*.bash", "*.yml", "*.yaml", "*.zsh"]
+    patterns:
+      - pattern-regex: '(curl|wget)\b[^\n|]*\|[^\n]*\b(sh|bash|zsh|dash)\b'
+
+  # ── PowerShell download-cradle ───────────────────────────────────────────────
+  - id: lf-powershell-download-cradle
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      PowerShell download-cradle (DownloadString/DownloadFile + IEX or
+      Invoke-WebRequest|iex). Fetches and executes remote code in one step,
+      the Windows equivalent of curl|bash. Stage the payload to disk and
+      verify it before running.
+    paths:
+      include: ["*.ps1", "*.psm1", "*.yml", "*.yaml"]
+    patterns:
+      - pattern-either:
+          - pattern-regex: '(?i)(New-Object\s+Net\.WebClient)[^\n]*\.DownloadString'
+          - pattern-regex: '(?i)DownloadString\([^\n]*\)[^\n]*\|\s*(iex|Invoke-Expression)'
+          - pattern-regex: '(?i)(iwr|Invoke-WebRequest|curl)\b[^\n|]*\|\s*(iex|Invoke-Expression)'
+
+  # ── Decode-and-execute (obfuscation) ─────────────────────────────────────────
+  - id: lf-decode-and-exec
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      Base64/hex content decoded and piped to an interpreter. Common
+      obfuscation for malicious install hooks — legitimate code rarely needs
+      to decode itself before running.
+    paths:
+      include: ["*.sh", "*.bash", "*.ps1", "*.psm1", "*.yml", "*.yaml"]
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\bbase64\s+(-d|--decode)\b[^\n]*\|[^\n]*\b(sh|bash|python|perl|node)\b'
+          - pattern-regex: '(?i)\[Convert\]::FromBase64String\([^\n]*\)[^\n]*(iex|Invoke-Expression)'
+          - pattern-regex: '(?i)-(enc|encodedcommand)\b'
+
+  # ── eval over fetched / command-substituted content ──────────────────────────
+  - id: lf-eval-remote
+    languages: [generic]
+    severity: ERROR
+    message: >-
+      eval over command-substituted remote content (eval "$(curl ...)").
+      Executes whatever the remote endpoint returns. Avoid eval on any
+      externally sourced string.
+    paths:
+      include: ["*.sh", "*.bash", "*.zsh", "*.yml", "*.yaml"]
+    patterns:
+      - pattern-regex: '\beval\b[^\n]*\$\((curl|wget)\b'
+
+  # ── TLS verification disabled on download ────────────────────────────────────
+  - id: lf-tls-verification-disabled
+    languages: [generic]
+    severity: WARNING
+    message: >-
+      TLS certificate verification disabled during a network fetch
+      (curl -k / --insecure, wget --no-check-certificate, or a PowerShell
+      ServerCertificateValidationCallback override). Defeats MITM protection
+      on the very download you are trusting.
+    paths:
+      include: ["*.sh", "*.bash", "*.ps1", "*.psm1", "*.yml", "*.yaml"]
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\bcurl\b[^\n]*\s(-k|--insecure)\b'
+          - pattern-regex: '\bwget\b[^\n]*--no-check-certificate\b'
+          - pattern-regex: '(?i)ServerCertificateValidationCallback\s*=\s*\{?\s*\$?true'
+
+  # ── Install straight from a VCS URL / git ref ────────────────────────────────
+  - id: lf-install-from-vcs-url
+    languages: [generic]
+    severity: WARNING
+    message: >-
+      Package installed directly from a VCS/URL rather than a pinned registry
+      release (pip install git+..., npm install <git-url>, cargo install
+      --git). Bypasses lockfiles and registry review; pin to a published,
+      hash-locked version instead.
+    paths:
+      include: ["*.sh", "*.bash", "*.ps1", "*.psm1", "*.yml", "*.yaml"]
+    patterns:
+      - pattern-either:
+          - pattern-regex: '\bpip(3)?\s+install\b[^\n]*\bgit\+'
+          - pattern-regex: '\bnpm\s+(install|i)\b[^\n]*\b(git\+|https?://|github:)'
+          - pattern-regex: '\bcargo\s+install\b[^\n]*--git\b'
+
+  # ── npm install scripts re-enabled inline ────────────────────────────────────
+  - id: lf-npm-scripts-reenabled
+    languages: [generic]
+    severity: WARNING
+    message: >-
+      npm invoked with install scripts force-enabled (--foreground-scripts or
+      --ignore-scripts=false). The rig default is ignore-scripts=true to block
+      postinstall payloads; only re-enable for a specific, reviewed package.
+    paths:
+      include: ["*.sh", "*.bash", "*.yml", "*.yaml"]
+    patterns:
+      - pattern-regex: '\bnpm\b[^\n]*(--foreground-scripts|--ignore-scripts[=\s]+false)'

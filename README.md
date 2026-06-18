@@ -12,10 +12,13 @@ Shared CI pipeline, pre-commit hooks, and pytest fixtures for LegionForge projec
 | `.github/workflows/test.yml` | Reusable CI job: pytest + coverage enforcement |
 | `.github/workflows/sast.yml` | Reusable CI job: semgrep (p/python + p/fastapi) + CodeQL |
 | `.github/workflows/audit.yml` | Reusable CI job: pip-audit CVE scan + pip-licenses compliance |
+| `.github/workflows/supply-chain.yml` | Reusable CI job: osv-scanner (multi-ecosystem deps + malicious packages) + risky-exec custom rules + optional Socket.dev |
 | `.github/workflows/secrets.yml` | Reusable CI job: gitleaks secret scanning |
 | `.github/workflows/sbom.yml` | Reusable CI job: CycloneDX SBOM generation |
+| `semgrep/legionforge-risky-exec.yml` | Custom Semgrep ruleset: curl\|bash installers, PowerShell download-cradles, decode-and-exec, TLS bypass |
+| `scripts/audit.sh` / `scripts/audit.ps1` | Local audit harness — Python + osv-scanner + shellcheck + semgrep + risky-exec |
 | `.pre-commit-hooks.yaml` | Hook definitions consumed via pre-commit |
-| `.pre-commit-config.yaml` | Default config to copy into new projects (includes gitleaks) |
+| `.pre-commit-config.yaml` | Default config to copy into new projects (includes gitleaks, shellcheck, osv-scanner) |
 | `SECURITY.md` | Vulnerability disclosure policy template — copy and adjust |
 | `src/legionforge_dev_rig/fixtures/` | Shared pytest fixtures (httpx mocking, etc.) |
 | `examples/` | Template conftest.py and example tests |
@@ -94,7 +97,18 @@ jobs:
 
   audit:
     uses: LegionForge/dev-rig/.github/workflows/audit.yml@main
+
+  supply-chain:
+    uses: LegionForge/dev-rig/.github/workflows/supply-chain.yml@main
+    secrets: inherit                   # ← only needed to enable the optional Socket.dev scan
 ```
+
+> **Multi-language note.** `supply-chain.yml` and the local `audit.sh`/`audit.ps1`
+> harness cover Python, JS/TS, and Rust (via osv-scanner lockfile scanning) plus
+> shell (shellcheck) and risky-exec patterns in shell/PowerShell/CI YAML. Each
+> section self-skips when its files or tools aren't present, so the rig is safe
+> to wire into any repo regardless of language mix. cargo-deny (Rust policy) and
+> PSScriptAnalyzer (PowerShell SAST) are the planned next additions.
 
 ### 4 — Add shared fixtures to tests/conftest.py
 
@@ -133,6 +147,8 @@ pre-commit autoupdate
 | bandit | 1.7 | `pyproject.toml [tool.bandit]` |
 | mypy | 1.10 | `pyproject.toml [tool.mypy]` |
 | pip-audit | 2.7 | no config — runs against installed packages |
-| semgrep | 1.70 | rulesets passed as CLI args |
+| osv-scanner | 2.3 | no config — scans lockfiles recursively (`brew install osv-scanner`) |
+| shellcheck | 0.10 | inline directives / `.shellcheckrc` (`brew install shellcheck`) |
+| semgrep | 1.70 | rulesets passed as CLI args + `semgrep/legionforge-risky-exec.yml` |
 | pytest-cov | 5 | `pyproject.toml [tool.pytest.ini_options]` |
 | pre-commit | 3.7 | `.pre-commit-config.yaml` |

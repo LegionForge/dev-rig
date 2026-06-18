@@ -1,11 +1,15 @@
 <#
 .SYNOPSIS
-    LegionForge audit harness — ruff, bandit, mypy, pip-audit, semgrep.
+    LegionForge audit harness — ruff, bandit, mypy, pip-audit, osv-scanner,
+    shellcheck, semgrep, and the custom risky-exec supply-chain ruleset.
 
 .DESCRIPTION
-    Runs all five static-analysis and security tools against a project directory.
+    Runs the static-analysis and security tools against a project directory.
     Native tools (ruff/bandit/mypy/pip-audit) run directly via py -3.13.
-    Semgrep runs via Docker to avoid Windows/Python 3.13+ build failures.
+    osv-scanner (multi-ecosystem dependency + malicious-package scan) and
+    shellcheck run as native binaries; both self-skip when absent.
+    Semgrep and the custom risky-exec ruleset run via Docker to avoid
+    Windows/Python 3.13+ build failures.
 
     Per-project configuration lives in two small files at the project root:
       .audit-dirs       — space-separated source dirs (e.g. "llm_valet svcmgr")
@@ -31,6 +35,10 @@ param(
 )
 
 $ProjectPath = (Resolve-Path $ProjectPath).Path
+
+# Dev-rig root (this script lives in <rig>/scripts/) — locates the bundled
+# custom Semgrep ruleset regardless of the consuming project's CWD.
+$RigRoot = Split-Path $PSScriptRoot -Parent
 
 # ── Read per-project config ───────────────────────────────────────────────────
 
@@ -120,6 +128,36 @@ Invoke-Tool "pip-audit" {
     py -3.13 -m pip_audit .
 }
 
+# ── osv-scanner — multi-ecosystem dependency + malicious-package scan ─────────
+# One pass over every lockfile (Python / npm / Cargo / …), checked against OSV
+# (CVEs + malicious-packages feed). --allow-no-lockfiles: nothing to scan is a
+# pass, not a failure. Self-skips when the binary isn't installed.
+
+if (Get-Command osv-scanner -ErrorAction SilentlyContinue) {
+    Invoke-Tool "osv-scanner" {
+        osv-scanner scan source --recursive --allow-no-lockfiles .
+    }
+} else {
+    Write-Section "osv-scanner"
+    Write-Host "  osv-scanner not installed — skipping (winget install Google.osv-scanner)" -ForegroundColor DarkGray
+}
+
+# ── shellcheck — shell script correctness + footguns ─────────────────────────
+# Runs only when the repo contains shell scripts.
+
+$shellFiles = Get-ChildItem -Path $ProjectPath -Recurse -File -Include *.sh, *.bash -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -notmatch '[\\/](\.git|\.venv|node_modules)[\\/]' }
+if ($shellFiles) {
+    if (Get-Command shellcheck -ErrorAction SilentlyContinue) {
+        Invoke-Tool "shellcheck" {
+            shellcheck @($shellFiles.FullName)
+        }
+    } else {
+        Write-Section "shellcheck"
+        Write-Host "  $($shellFiles.Count) shell script(s) found but shellcheck not installed — skipping" -ForegroundColor DarkGray
+    }
+}
+
 # ── semgrep — OWASP / framework-specific vulnerability patterns ───────────────
 # Runs inside the official Docker image to avoid Windows/Python 3.13 build issues.
 # First run pulls the image (~200 MB); subsequent runs use the local cache.
@@ -140,6 +178,23 @@ Invoke-Tool "semgrep" {
     }
     $dockerArgs += "--error"
     & docker @dockerArgs
+}
+
+# ── risky-exec — LegionForge custom supply-chain / RCE pattern rules ──────────
+# Flags curl|bash installers, PowerShell download-cradles, decode-and-exec, and
+# TLS-bypass patterns ecosystem scanners can't see. Same Docker semgrep image,
+# mounting the rig's bundled ruleset read-only.
+
+$riskyRules = Join-Path $RigRoot "semgrep/legionforge-risky-exec.yml"
+if (Test-Path $riskyRules) {
+    Invoke-Tool "risky-exec" {
+        $rigSemgrep = Join-Path $RigRoot "semgrep"
+        & docker run --rm `
+            -v "${ProjectPath}:/src" `
+            -v "${rigSemgrep}:/rules:ro" `
+            semgrep/semgrep `
+            semgrep --config /rules/legionforge-risky-exec.yml /src --error
+    }
 }
 
 # ── Summary ───────────────────────────────────────────────────────────────────
