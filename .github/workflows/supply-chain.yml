@@ -74,7 +74,7 @@ jobs:
         run: |
           semgrep --config .dev-rig/semgrep/legionforge-risky-exec.yml \
             --error --metrics=off \
-            --exclude .dev-rig .
+            --exclude .dev-rig --exclude .claude --exclude node_modules --exclude semgrep .
 
   # ── Optional Socket.dev behavioral npm scan ──────────────────────────────────
   # Self-skips when no SOCKET_SECURITY_API_KEY secret is provided, so callers

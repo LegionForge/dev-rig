@@ -7,6 +7,12 @@
 # Scope: shell (.sh/.bash), PowerShell (.ps1/.psm1), and CI YAML, matched in
 # Semgrep "generic" mode so a single ruleset spans every file type.
 #
+# Comment handling: rules use pattern-regex (raw text), which bypasses generic
+# mode's comment tokenizer — so each rule ANDs a `pattern-not-regex` excluding
+# full-line #-comments. This keeps documented usage examples (e.g. a
+# "# curl ... | bash" install note) from tripping the rules; only executable
+# lines are flagged. (# is the line-comment char in shell, PowerShell, and YAML.)
+#
 # Run:
 #   semgrep --config semgrep/legionforge-risky-exec.yml --error <path>
 # Wired into scripts/audit.sh and .github/workflows/supply-chain.yml.
@@ -25,6 +31,7 @@ rules:
       include: ["*.sh", "*.bash", "*.yml", "*.yaml", "*.zsh"]
     patterns:
       - pattern-regex: '(curl|wget)\b[^\n|]*\|[^\n]*\b(sh|bash|zsh|dash)\b'
+      - pattern-not-regex: '(?m)^\s*#.*'
 
   # ── PowerShell download-cradle ───────────────────────────────────────────────
   - id: lf-powershell-download-cradle
@@ -42,6 +49,7 @@ rules:
           - pattern-regex: '(?i)(New-Object\s+Net\.WebClient)[^\n]*\.DownloadString'
           - pattern-regex: '(?i)DownloadString\([^\n]*\)[^\n]*\|\s*(iex|Invoke-Expression)'
           - pattern-regex: '(?i)(iwr|Invoke-WebRequest|curl)\b[^\n|]*\|\s*(iex|Invoke-Expression)'
+      - pattern-not-regex: '(?m)^\s*#.*'
 
   # ── Decode-and-execute (obfuscation) ─────────────────────────────────────────
   - id: lf-decode-and-exec
@@ -58,6 +66,7 @@ rules:
           - pattern-regex: '\bbase64\s+(-d|--decode)\b[^\n]*\|[^\n]*\b(sh|bash|python|perl|node)\b'
           - pattern-regex: '(?i)\[Convert\]::FromBase64String\([^\n]*\)[^\n]*(iex|Invoke-Expression)'
           - pattern-regex: '(?i)-(enc|encodedcommand)\b'
+      - pattern-not-regex: '(?m)^\s*#.*'
 
   # ── eval over fetched / command-substituted content ──────────────────────────
   - id: lf-eval-remote
@@ -71,6 +80,7 @@ rules:
       include: ["*.sh", "*.bash", "*.zsh", "*.yml", "*.yaml"]
     patterns:
       - pattern-regex: '\beval\b[^\n]*\$\((curl|wget)\b'
+      - pattern-not-regex: '(?m)^\s*#.*'
 
   # ── TLS verification disabled on download ────────────────────────────────────
   - id: lf-tls-verification-disabled
@@ -88,6 +98,7 @@ rules:
           - pattern-regex: '\bcurl\b[^\n]*\s(-k|--insecure)\b'
           - pattern-regex: '\bwget\b[^\n]*--no-check-certificate\b'
           - pattern-regex: '(?i)ServerCertificateValidationCallback\s*=\s*\{?\s*\$?true'
+      - pattern-not-regex: '(?m)^\s*#.*'
 
   # ── Install straight from a VCS URL / git ref ────────────────────────────────
   - id: lf-install-from-vcs-url
@@ -105,6 +116,7 @@ rules:
           - pattern-regex: '\bpip(3)?\s+install\b[^\n]*\bgit\+'
           - pattern-regex: '\bnpm\s+(install|i)\b[^\n]*\b(git\+|https?://|github:)'
           - pattern-regex: '\bcargo\s+install\b[^\n]*--git\b'
+      - pattern-not-regex: '(?m)^\s*#.*'
 
   # ── npm install scripts re-enabled inline ────────────────────────────────────
   - id: lf-npm-scripts-reenabled
@@ -118,3 +130,4 @@ rules:
       include: ["*.sh", "*.bash", "*.yml", "*.yaml"]
     patterns:
       - pattern-regex: '\bnpm\b[^\n]*(--foreground-scripts|--ignore-scripts[=\s]+false)'
+      - pattern-not-regex: '(?m)^\s*#.*'

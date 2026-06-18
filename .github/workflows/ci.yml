@@ -1,0 +1,53 @@
+# Self-test CI for the dev-rig.
+#
+# The rig's other workflows are all reusable (workflow_call) and were never
+# exercised end-to-end. This workflow invokes each of them against the rig
+# itself — using LOCAL refs (./.github/workflows/*.yml) so a PR validates its
+# own versions of the workflows, not the ones already on main. It both proves
+# the reusable workflows work and guards them against silent regressions.
+
+name: CI (self-test)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+    with:
+      source-dirs: "src/legionforge_dev_rig"
+      extra-mypy-deps: "types-PyYAML httpx respx pytest"
+
+  test:
+    uses: ./.github/workflows/test.yml
+    with:
+      coverage-source: "legionforge_dev_rig"
+      coverage-threshold: 80
+
+  sast:
+    uses: ./.github/workflows/sast.yml
+    with:
+      source-dirs: "src/legionforge_dev_rig"
+      semgrep-configs: "p/python"
+    permissions:
+      security-events: write
+
+  audit:
+    uses: ./.github/workflows/audit.yml
+
+  supply-chain:
+    uses: ./.github/workflows/supply-chain.yml
+    with:
+      # Pull the risky-exec ruleset from THIS branch so self-CI tests the PR's
+      # rules, not whatever is on main.
+      rig-ref: ${{ github.head_ref || github.ref_name }}
+    secrets: inherit
+
+  secrets:
+    uses: ./.github/workflows/secrets.yml
+
+  sbom:
+    uses: ./.github/workflows/sbom.yml

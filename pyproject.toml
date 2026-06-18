@@ -43,6 +43,11 @@ ignore = [
     "S607",   # partial executable path — acceptable for system binaries
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Tests and examples legitimately use `assert` (S101) for verification.
+"tests/**" = ["S101"]
+"examples/**" = ["S101"]
+
 [tool.bandit]
 exclude_dirs = [".venv", "venv", ".git", "tests"]
 skips = [
