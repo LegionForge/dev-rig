@@ -11,8 +11,7 @@ name: CI (self-test)
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  pull_request:        # all PRs, regardless of base — so stacked branches self-test too
 
 jobs:
   lint:
