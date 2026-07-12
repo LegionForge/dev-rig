@@ -102,6 +102,12 @@ has_python_deps() {
            -not -path '*/node_modules/*')" ]]
 }
 
+python_requirement_files() {
+    find "$PROJECT" -type f -name 'requirements*.txt' \
+        -not -path '*/.git/*' -not -path '*/.venv/*' -not -path '*/venv/*' \
+        -not -path '*/node_modules/*' 2>/dev/null
+}
+
 python_runner() {
     if command -v py > /dev/null 2>&1; then
         echo "py -3.13"
@@ -177,7 +183,16 @@ fi
 # ── pip-audit ─────────────────────────────────────────────────────────────────
 
 if [[ "$HAS_PYTHON_DEPS" -eq 1 ]]; then
-    run_python_module_or_command "pip-audit" "pip-audit" "pip_audit" .
+    pip_audit_args=()
+    while IFS= read -r requirements_file; do
+        pip_audit_args+=("-r" "$requirements_file")
+    done < <(python_requirement_files)
+
+    if [[ ${#pip_audit_args[@]} -eq 0 ]]; then
+        pip_audit_args=(".")
+    fi
+
+    run_python_module_or_command "pip-audit" "pip-audit" "pip_audit" "${pip_audit_args[@]}"
 else
     skip_tool "pip-audit" "no Python dependency manifests found — skipping"
 fi
