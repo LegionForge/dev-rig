@@ -16,7 +16,7 @@ Shared CI pipeline, pre-commit hooks, and pytest fixtures for LegionForge projec
 | `.github/workflows/secrets.yml` | Reusable CI job: gitleaks secret scanning |
 | `.github/workflows/sbom.yml` | Reusable CI job: CycloneDX SBOM generation |
 | `semgrep/legionforge-risky-exec.yml` | Custom Semgrep ruleset: curl\|bash installers, PowerShell download-cradles, decode-and-exec, TLS bypass |
-| `scripts/audit.sh` / `scripts/audit.ps1` | Local audit harness — Python + osv-scanner + shellcheck + semgrep + risky-exec |
+| `scripts/audit.sh` / `scripts/audit.ps1` | Local audit harness — Python when applicable + gitleaks + osv-scanner + shellcheck + semgrep + risky-exec |
 | `.pre-commit-hooks.yaml` | Hook definitions consumed via pre-commit |
 | `.pre-commit-config.yaml` | Default config to copy into new projects (includes gitleaks, shellcheck, osv-scanner) |
 | `SECURITY.md` | Vulnerability disclosure policy template — copy and adjust |
@@ -109,6 +109,13 @@ jobs:
 > section self-skips when its files or tools aren't present, so the rig is safe
 > to wire into any repo regardless of language mix. cargo-deny (Rust policy) and
 > PSScriptAnalyzer (PowerShell SAST) are the planned next additions.
+
+> **Static-site note.** Repos with no package or Python sources are still
+> auditable. The local harness skips Python-only tools, then still runs the
+> applicable checks: gitleaks, osv-scanner, shellcheck when shell files exist,
+> Semgrep packs when Docker is available, and the LegionForge risky-exec rules.
+> A result of "nothing applicable" is a valid audit outcome, not a reason to
+> skip the repo.
 
 ### 4 — Add shared fixtures to tests/conftest.py
 
