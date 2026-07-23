@@ -40,12 +40,16 @@ jobs:
 
       - name: pip-audit (CVE scan)
         run: |
-          pip install pip-audit
+          python -m pip install --upgrade \
+            "pip>=26.1.2" \
+            "setuptools>=83.0.0" \
+            "msgpack>=1.2.1" \
+            pip-audit
           IGNORE_FLAGS=""
           for vuln in ${{ inputs.ignore-vulns }}; do
             IGNORE_FLAGS="$IGNORE_FLAGS --ignore-vuln $vuln"
           done
-          python -m pip_audit $IGNORE_FLAGS
+          python -m pip_audit --skip-editable $IGNORE_FLAGS
 
       - name: pip-licenses (license compliance — OWASP SAMM Operations)
         run: |
