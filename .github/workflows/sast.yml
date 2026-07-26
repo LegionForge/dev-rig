@@ -60,9 +60,19 @@ jobs:
     # ("Repository not found", not a clearer permissions error). The semgrep job
     # above has no permissions: block and inherits the default set fine -- that's
     # the working reference this follows.
+    #
+    # actions: read is ALSO required (found after fixing contents: read and
+    # actually re-running end to end, not just assuming the first fix was
+    # complete) -- the SARIF fingerprinting/upload step calls the workflow-runs
+    # API to deduplicate alerts, which needs this scope. Without it, checkout
+    # and the full CodeQL scan succeed, but the job fails at the very last step
+    # with "Resource not accessible by integration" / "CodeQL job status was
+    # configuration error" -- confirmed on both push- and workflow_dispatch-
+    # triggered runs on jp-cruz/row-bot.
     permissions:
       contents: read
       security-events: write
+      actions: read
     steps:
       - uses: actions/checkout@v7
 
