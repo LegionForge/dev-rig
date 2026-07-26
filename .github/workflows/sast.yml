@@ -54,7 +54,14 @@ jobs:
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
+    # Specifying any `permissions:` key at job level replaces the full default set
+    # rather than adding to it -- security-events: write alone silently dropped
+    # contents: read, breaking actions/checkout for every consumer of this workflow
+    # ("Repository not found", not a clearer permissions error). The semgrep job
+    # above has no permissions: block and inherits the default set fine -- that's
+    # the working reference this follows.
     permissions:
+      contents: read
       security-events: write
     steps:
       - uses: actions/checkout@v7
