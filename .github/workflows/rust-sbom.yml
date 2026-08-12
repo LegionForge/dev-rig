@@ -1,0 +1,56 @@
+# Reusable workflow: SBOM generation — CycloneDX JSON (Rust/Cargo)
+# (OWASP SAMM — Implementation/Secure Build)
+#
+# Produces a CycloneDX JSON SBOM from Cargo dependencies and uploads it
+# as a build artifact retained for 90 days.
+#
+# Caller syntax:
+#
+#   jobs:
+#     sbom:
+#       uses: LegionForge/dev-rig/.github/workflows/rust-sbom.yml@main
+
+name: SBOM (Rust)
+
+on:
+  workflow_call:
+
+jobs:
+  sbom:
+    name: Generate SBOM (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --locked
+
+      - name: Generate SBOM (CycloneDX JSON)
+        run: |
+          cargo cyclonedx --format json
+          echo "=== SBOM summary ==="
+          SBOM=$(ls *.cdx.json 2>/dev/null | head -1)
+          if [ -n "$SBOM" ]; then
+            python3 -c "
+          import json, sys
+          data = json.load(open('$SBOM'))
+          comps = data.get('components', [])
+          print(f'{len(comps)} components')
+          for c in comps[:10]:
+              print(f'  {c[\"name\"]}=={c.get(\"version\",\"?\")}')
+          if len(comps) > 10:
+              print(f'  ... and {len(comps)-10} more')
+          "
+          fi
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-cyclonedx-rust
+          path: "*.cdx.json"
+          retention-days: 90

@@ -1,0 +1,70 @@
+# Reusable workflow: tests + coverage enforcement (Node/TypeScript)
+#
+# Works with vitest, jest, or any runner that exits non-zero on coverage failure.
+# Coverage threshold is enforced by the project's own runner config:
+#   vitest.config.ts → coverage.thresholds
+#   jest.config      → coverageThreshold
+# The threshold input is passed as COVERAGE_THRESHOLD env var for configs that read it.
+#
+# Standard LegionForge npm script expected:
+#   "test:coverage": "vitest run --coverage"   (vitest)
+#   "test:coverage": "jest --coverage"         (jest)
+#
+# Caller syntax:
+#
+#   jobs:
+#     test:
+#       uses: LegionForge/dev-rig/.github/workflows/node-test.yml@main
+#       with:
+#         coverage-threshold: 80
+
+name: Tests & Coverage (Node)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "20"
+      test-script:
+        description: "npm script to run (must emit coverage)"
+        required: false
+        type: string
+        default: "test:coverage"
+      coverage-threshold:
+        description: "Minimum coverage % — passed to runner via COVERAGE_THRESHOLD env var"
+        required: false
+        type: number
+        default: 80
+
+jobs:
+  test:
+    name: Tests & Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests with coverage
+        env:
+          COVERAGE_THRESHOLD: ${{ inputs.coverage-threshold }}
+        run: npm run ${{ inputs.test-script }}
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage-node
+          path: |
+            coverage/
+            coverage.xml
+          retention-days: 90

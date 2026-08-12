@@ -1,0 +1,67 @@
+# Reusable workflow: lint + type check (Node/TypeScript)
+#
+# Expects the calling project to have in devDependencies:
+#   - typescript          → tsc --noEmit (always runs)
+#   - eslint              → skipped gracefully if no config file present
+#   - @typescript-eslint/eslint-plugin + @typescript-eslint/parser (if using TS rules)
+#
+# Standard LegionForge npm scripts expected:
+#   "typecheck": "tsc --noEmit"
+#   "lint":      "eslint <source-dirs>"   (optional — add when ready)
+#
+# Caller syntax:
+#
+#   jobs:
+#     lint:
+#       uses: LegionForge/dev-rig/.github/workflows/node-lint.yml@main
+#       with:
+#         source-dirs: "src"
+
+name: Lint & Type Check (Node)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "20"
+      source-dirs:
+        description: "Space-separated source directories for eslint"
+        required: false
+        type: string
+        default: "src"
+      typecheck-script:
+        description: "npm script name for TypeScript type checking"
+        required: false
+        type: string
+        default: "typecheck"
+
+jobs:
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run ${{ inputs.typecheck-script }}
+
+      - name: ESLint
+        # Skip gracefully if eslint is not configured in this project
+        run: |
+          if [ -f eslint.config.js ] || [ -f eslint.config.mjs ] || [ -f eslint.config.cjs ] || \
+             [ -f .eslintrc.js ] || [ -f .eslintrc.cjs ] || [ -f .eslintrc.json ] || [ -f .eslintrc.yml ]; then
+            npx eslint ${{ inputs.source-dirs }}
+          else
+            echo "No ESLint config found — skipping. Add eslint.config.js to enable linting."
+          fi

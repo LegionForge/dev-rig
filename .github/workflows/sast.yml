@@ -34,9 +34,9 @@ jobs:
     name: Semgrep SAST
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python-version }}
 
@@ -54,19 +54,36 @@ jobs:
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
+    # Specifying any `permissions:` key at job level replaces the full default set
+    # rather than adding to it -- security-events: write alone silently dropped
+    # contents: read, breaking actions/checkout for every consumer of this workflow
+    # ("Repository not found", not a clearer permissions error). The semgrep job
+    # above has no permissions: block and inherits the default set fine -- that's
+    # the working reference this follows.
+    #
+    # actions: read is ALSO required (found after fixing contents: read and
+    # actually re-running end to end, not just assuming the first fix was
+    # complete) -- the SARIF fingerprinting/upload step calls the workflow-runs
+    # API to deduplicate alerts, which needs this scope. Without it, checkout
+    # and the full CodeQL scan succeed, but the job fails at the very last step
+    # with "Resource not accessible by integration" / "CodeQL job status was
+    # configuration error" -- confirmed on both push- and workflow_dispatch-
+    # triggered runs on jp-cruz/row-bot.
     permissions:
+      contents: read
       security-events: write
+      actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: python
           queries: security-extended
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4

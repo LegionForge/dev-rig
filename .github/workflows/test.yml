@@ -38,9 +38,9 @@ jobs:
     name: Tests & Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python-version }}
           cache: pip
@@ -57,7 +57,7 @@ jobs:
             --cov-fail-under=${{ inputs.coverage-threshold }}
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-xml

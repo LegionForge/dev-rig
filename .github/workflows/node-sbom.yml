@@ -1,0 +1,58 @@
+# Reusable workflow: SBOM generation — CycloneDX JSON (Node/TypeScript)
+# (OWASP SAMM — Implementation/Secure Build)
+#
+# Produces a CycloneDX JSON SBOM from npm dependencies and uploads it
+# as a build artifact retained for 90 days.
+#
+# Caller syntax:
+#
+#   jobs:
+#     sbom:
+#       uses: LegionForge/dev-rig/.github/workflows/node-sbom.yml@main
+
+name: SBOM (Node)
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version to use"
+        required: false
+        type: string
+        default: "20"
+
+jobs:
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate SBOM (CycloneDX JSON)
+        run: |
+          npx --yes @cyclonedx/cyclonedx-npm \
+            --output-format json \
+            --output-file sbom.json
+          echo "=== SBOM summary ==="
+          node -e "
+            const d = require('./sbom.json');
+            const c = d.components || [];
+            console.log(c.length + ' components');
+            c.slice(0, 10).forEach(x => console.log('  ' + x.name + ' ' + (x.version || '?')));
+            if (c.length > 10) console.log('  ... and ' + (c.length - 10) + ' more');
+          "
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-cyclonedx-node
+          path: sbom.json
+          retention-days: 90
