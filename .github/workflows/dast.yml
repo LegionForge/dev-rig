@@ -1,0 +1,119 @@
+# Reusable workflow: OWASP ZAP dynamic application security testing.
+# The caller must start the service and pass its reachable URL.
+
+name: DAST
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-rig-dast-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_call:
+    inputs:
+      target-url:
+        description: "URL of the running service"
+        required: true
+        type: string
+      fail-on-severity:
+        description: "Minimum severity to fail on: None, Low, Medium, High"
+        required: false
+        type: string
+        default: "High"
+      zap-image:
+        description: "ZAP Docker image reference"
+        required: false
+        type: string
+        default: "ghcr.io/zaproxy/zaproxy:stable"
+
+jobs:
+  zap-baseline:
+    name: OWASP ZAP Baseline Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Required only to publish the validated ZAP SARIF report.
+      security-events: write # zizmor: ignore[undocumented-permissions] — uploads ZAP SARIF
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+
+      - name: Run ZAP baseline scan
+        id: zap
+        env:
+          TARGET_URL: ${{ inputs.target-url }}
+          ZAP_IMAGE: ${{ inputs.zap-image }}
+        shell: bash
+        run: |
+          [[ "$TARGET_URL" =~ ^https?:// ]] || { echo "target-url must be http(s)"; exit 2; }
+          [[ "$ZAP_IMAGE" =~ ^[A-Za-z0-9./:@_-]+$ ]] || { echo "invalid zap-image"; exit 2; }
+          set +e
+          docker run --rm \
+            -v "$PWD:/zap/wrk:rw" \
+            "$ZAP_IMAGE" \
+            zap-baseline.py \
+              -t "$TARGET_URL" \
+              -J zap-report.json \
+              -r zap-report.html
+          status=$?
+          echo "scanner-exit-code=$status" >> "$GITHUB_OUTPUT"
+          # ZAP's baseline exit code includes findings; severity is evaluated below.
+          exit 0
+
+      - name: Convert ZAP JSON to SARIF and enforce threshold
+        env:
+          FAIL_THRESHOLD: ${{ inputs.fail-on-severity }}
+        run: |
+          [[ "$FAIL_THRESHOLD" =~ ^(None|Low|Medium|High)$ ]] || { echo "Unknown fail-on-severity"; exit 2; }
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          source = Path("zap-report.json")
+          if not source.is_file():
+              raise SystemExit("ZAP did not produce zap-report.json")
+          data = json.loads(source.read_text())
+          results = []
+          counts = {"High": 0, "Medium": 0, "Low": 0, "Informational": 0}
+          risk_names = {"3": "High", "2": "Medium", "1": "Low", "0": "Informational"}
+          for site in data.get("site", []):
+              for alert in site.get("alerts", []):
+                  severity = risk_names.get(str(alert.get("riskcode", "0")), "Informational")
+                  counts[severity] += 1
+                  instances = alert.get("instances") or [{}]
+                  for instance in instances:
+                      results.append({
+                          "ruleId": str(alert.get("pluginid", alert.get("alert", "zap"))),
+                          "level": {"High": "error", "Medium": "error", "Low": "warning", "Informational": "note"}[severity],
+                          "message": {"text": f"{alert.get('alert', 'ZAP finding')} ({severity})"},
+                          "locations": [{"physicalLocation": {"artifactLocation": {"uri": instance.get("uri", "")}}}],
+                      })
+          sarif = {"version": "2.1.0", "$schema": "https://json.schemastore.org/sarif-2.1.0.json", "runs": [{"tool": {"driver": {"name": "OWASP ZAP"}}, "results": results}]}
+          Path("zap-report.sarif").write_text(json.dumps(sarif, indent=2) + "\n")
+          print(json.dumps(counts, sort_keys=True))
+          threshold = {"None": None, "Low": "Low", "Medium": "Medium", "High": "High"}.get(os.environ["FAIL_THRESHOLD"])
+          order = ["Informational", "Low", "Medium", "High"]
+          if threshold and any(counts[level] for level in order[order.index(threshold):]):
+              raise SystemExit(f"ZAP findings meet or exceed {threshold} severity")
+          PY
+
+      - name: Upload ZAP SARIF
+        if: always() && hashFiles('zap-report.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c3400c2f38909e0dcf3c3a41f2030a8217be5d3e  # v3
+        with:
+          sarif_file: zap-report.sarif
+          category: owasp-zap
+
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: zap-reports
+          path: zap-report.*
+          if-no-files-found: error
+          retention-days: 30

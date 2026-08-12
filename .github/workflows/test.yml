@@ -10,6 +10,13 @@
 
 name: Tests & Coverage
 
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-rig-test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_call:
     inputs:
@@ -37,27 +44,41 @@ jobs:
   test:
     name: Tests & Coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
         with:
           python-version: ${{ inputs.python-version }}
           cache: pip
 
       - name: Install dev dependencies
-        run: pip install -e ".[dev]" ${{ inputs.extra-deps }}
+        env:
+          EXTRA_DEPS: ${{ inputs.extra-deps }}
+        run: |
+          read -r -a deps <<< "$EXTRA_DEPS"
+          python -m pip install -e ".[dev]" "${deps[@]}"
 
       - name: pytest with coverage
+        env:
+          COVERAGE_SOURCE: ${{ inputs.coverage-source }}
+          COVERAGE_THRESHOLD: ${{ inputs.coverage-threshold }}
         run: |
+          [[ "$COVERAGE_SOURCE" =~ ^[A-Za-z0-9_./-]+$ ]] || { echo "Invalid coverage source"; exit 2; }
+          [[ "$COVERAGE_THRESHOLD" =~ ^[0-9]+$ ]] || { echo "Invalid coverage threshold"; exit 2; }
           python -m pytest \
-            --cov=${{ inputs.coverage-source }} \
+            --cov="$COVERAGE_SOURCE" \
             --cov-report=term-missing \
             --cov-report=xml \
-            --cov-fail-under=${{ inputs.coverage-threshold }}
+            --cov-fail-under="$COVERAGE_THRESHOLD"
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         if: always()
         with:
           name: coverage-xml

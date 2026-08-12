@@ -1,0 +1,29 @@
+name: SBOM (Rust)
+
+on: {workflow_call: {}}
+
+permissions: {contents: read}
+
+concurrency:
+  group: dev-rig-rust-sbom-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sbom:
+    name: Generate SBOM (Rust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with: {persist-credentials: false}
+      # zizmor: ignore[superfluous-actions] — selects caller toolchain
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772  # master
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx --locked
+      - run: cargo cyclonedx --format json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: sbom-cyclonedx-rust
+          path: "*.cdx.json"
+          if-no-files-found: error
+          retention-days: 30

@@ -1,0 +1,40 @@
+name: Rust Dependency Audit
+
+on:
+  workflow_call:
+    inputs:
+      ignore-advisories:
+        type: string
+        required: false
+        default: ""
+
+concurrency:
+  group: dev-rig-rust-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-audit:
+    name: Cargo Audit (RustSec)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with: {persist-credentials: false}
+      # zizmor: ignore[superfluous-actions] — selects caller toolchain
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772  # master
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Audit dependencies
+        env:
+          IGNORE_ADVISORIES: ${{ inputs.ignore-advisories }}
+        run: |
+          read -r -a advisories <<< "$IGNORE_ADVISORIES"
+          flags=()
+          for id in "${advisories[@]}"; do
+            [[ "$id" =~ ^RUSTSEC-[0-9]{4}-[0-9]{4}$ ]] || { echo "Invalid RustSec ID"; exit 2; }
+            flags+=(--ignore "$id")
+          done
+          cargo audit "${flags[@]}"

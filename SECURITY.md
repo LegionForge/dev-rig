@@ -44,7 +44,20 @@ This project applies the following controls aligned with OWASP SAMM Level 1:
 | Secret scanning | gitleaks | CI (`secrets.yml`) + pre-commit |
 | SBOM generation | CycloneDX | CI (`sbom.yml`) — artifacts on each release |
 | Pre-commit hooks | ruff, bandit, mypy, gitleaks | Local dev |
+| CI/CD control audit | dev-rig OSS risk audit + zizmor | CI (`oss-audit.yml`) |
+| Build provenance | GitHub artifact attestations | Release/build workflows |
 
 ## Threat Model
 
 See `CLAUDE.md` or project documentation for the full threat model (T1–T8).
+
+## Control policy
+
+Reusable workflows must use explicit least-privilege permissions, bounded
+timeouts, concurrency cancellation, SHA-pinned actions, and
+`persist-credentials: false` on checkout. Caller-controlled inputs must be
+passed through environment variables and validated before use; direct shell
+interpolation is prohibited. High and critical scanner findings fail CI.
+
+Security exceptions require a named owner, a reason, a tracking issue, and an
+expiry date. Permanent suppressions are not accepted.

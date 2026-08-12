@@ -1,5 +1,6 @@
 """Shared httpx / respx fixtures for async HTTP provider testing."""
-from collections.abc import AsyncGenerator, Generator
+
+from collections.abc import Generator
 from typing import Any
 
 import httpx
@@ -37,7 +38,9 @@ def mock_http_client(respx_mock_base_url: respx.MockRouter) -> httpx.AsyncClient
             provider = OllamaProvider(client=mock_http_client)
             assert await provider.health_check() is True
     """
-    return httpx.AsyncClient(transport=respx_mock_base_url)
+    return httpx.AsyncClient(
+        transport=httpx.MockTransport(respx_mock_base_url.async_handler)
+    )
 
 
 def json_response(data: dict[str, Any], status: int = 200) -> httpx.Response:
