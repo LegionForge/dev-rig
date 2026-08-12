@@ -52,6 +52,24 @@ repos:
           - psutil
           - uvicorn
 
+  # ── shellcheck — shell script correctness + footguns ──────────────────────
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.10.0
+    hooks:
+      - id: shellcheck
+
+  # ── osv-scanner — dependency vuln + malicious-package scan (multi-ecosystem)─
+  # Local hook (uses the installed osv-scanner binary). Triggers only when a
+  # lockfile changes; scans the whole tree so cross-ecosystem repos are covered.
+  - repo: local
+    hooks:
+      - id: osv-scanner
+        name: osv-scanner (deps + malicious packages)
+        entry: osv-scanner scan source --recursive --allow-no-lockfiles .
+        language: system
+        pass_filenames: false
+        files: '(requirements.*\.txt|poetry\.lock|uv\.lock|Pipfile\.lock|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Cargo\.lock|go\.sum)$'
+
   # ── gitleaks — secret scanning (OWASP SAMM — Implementation/Secure Build) ──
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.18.4
