@@ -13,21 +13,31 @@ on:
     branches: [main]
   pull_request:        # all PRs, regardless of base — so stacked branches self-test too
 
+permissions:
+  contents: read
+
+concurrency:
+  group: self-test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     uses: ./.github/workflows/lint.yml
+    timeout-minutes: 15
     with:
       source-dirs: "src/legionforge_dev_rig"
       extra-mypy-deps: "types-PyYAML httpx respx pytest"
 
   test:
     uses: ./.github/workflows/test.yml
+    timeout-minutes: 15
     with:
       coverage-source: "legionforge_dev_rig"
       coverage-threshold: 80
 
   sast:
     uses: ./.github/workflows/sast.yml
+    timeout-minutes: 20
     with:
       source-dirs: "src/legionforge_dev_rig"
       semgrep-configs: "p/python"
@@ -36,9 +46,11 @@ jobs:
 
   audit:
     uses: ./.github/workflows/audit.yml
+    timeout-minutes: 15
 
   supply-chain:
     uses: ./.github/workflows/supply-chain.yml
+    timeout-minutes: 20
     with:
       # Pull the risky-exec ruleset from THIS branch so self-CI tests the PR's
       # rules, not whatever is on main.
@@ -47,6 +59,8 @@ jobs:
 
   secrets:
     uses: ./.github/workflows/secrets.yml
+    timeout-minutes: 10
 
   sbom:
     uses: ./.github/workflows/sbom.yml
+    timeout-minutes: 15

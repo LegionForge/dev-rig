@@ -19,6 +19,13 @@
 
 name: Supply Chain
 
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_call:
     inputs:
@@ -42,30 +49,43 @@ jobs:
   osv-scanner:
     name: osv-scanner (deps + malicious packages)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
 
       # Pinned container image (matches the rig's docker-based tooling pattern).
       # --allow-no-lockfiles: a repo with nothing to scan is a pass, not a fail.
       - name: osv-scanner scan
+        env:
+          OSV_VERSION: ${{ inputs.osv-version }}
         run: |
+          case "$OSV_VERSION" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "Invalid osv-scanner version" >&2; exit 1 ;;
+          esac
           docker run --rm -v "${{ github.workspace }}:/src" \
-            "ghcr.io/google/osv-scanner:${{ inputs.osv-version }}" \
+            "ghcr.io/google/osv-scanner:${OSV_VERSION}" \
             scan source --recursive --allow-no-lockfiles /src
 
   # ── Custom risky-exec / supply-chain pattern rules ───────────────────────────
   risky-exec:
     name: risky-exec (custom Semgrep rules)
     runs-on: ubuntu-latest
-    container: semgrep/semgrep
+    timeout-minutes: 15
+    container: semgrep/semgrep@sha256:09c53965afa710cbe57e0bfbd13546268700e8422586823a297d5e1a1fbd3ead
     steps:
       - name: Checkout caller repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
 
       # The ruleset lives in dev-rig, not the consuming repo — pull it alongside.
       - name: Checkout dev-rig ruleset
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
+          persist-credentials: false
           repository: LegionForge/dev-rig
           ref: ${{ inputs.rig-ref }}
           path: .dev-rig
@@ -82,8 +102,11 @@ jobs:
   socket:
     name: socket (optional npm behavioral)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
 
       - name: Socket scan (skips without token)
         env:
