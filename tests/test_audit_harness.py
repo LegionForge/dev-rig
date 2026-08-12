@@ -11,7 +11,9 @@ def _write_executable(path: Path, text: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
-def test_audit_harness_handles_static_repo_without_python_or_docker(tmp_path: Path) -> None:
+def test_audit_harness_handles_static_repo_without_python_or_docker(
+    tmp_path: Path,
+) -> None:
     project = tmp_path / "static-site"
     project.mkdir()
     (project / "index.md").write_text("# Static site\n", encoding="utf-8")

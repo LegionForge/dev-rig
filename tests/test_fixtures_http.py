@@ -3,6 +3,7 @@
 These also serve as the rig's own self-test target so test.yml is validated
 end-to-end against the rig itself (see .github/workflows/ci.yml).
 """
+
 import httpx
 import pytest
 
