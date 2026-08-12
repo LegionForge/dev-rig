@@ -27,8 +27,12 @@ def respx_mock_base_url() -> Generator[respx.MockRouter, None, None]:
 @pytest.fixture
 def mock_http_client(respx_mock_base_url: respx.MockRouter) -> httpx.AsyncClient:
     """
-    An httpx.AsyncClient wired into the respx mock router.
+    An httpx.AsyncClient whose requests are intercepted by the respx mock.
     Pass this directly to provider constructors that accept a client parameter.
+
+    The respx_mock_base_url fixture activates respx.mock(), which patches httpx's
+    transport globally — so a plain AsyncClient is routed through the mock. (Do
+    NOT pass the router as `transport=`; a MockRouter is not an httpx transport.)
 
     Usage:
         async def test_health(mock_http_client):
@@ -38,9 +42,13 @@ def mock_http_client(respx_mock_base_url: respx.MockRouter) -> httpx.AsyncClient
             provider = OllamaProvider(client=mock_http_client)
             assert await provider.health_check() is True
     """
+<<<<<<< HEAD
     return httpx.AsyncClient(
         transport=httpx.MockTransport(respx_mock_base_url.async_handler)
     )
+=======
+    return httpx.AsyncClient()
+>>>>>>> origin/main
 
 
 def json_response(data: dict[str, Any], status: int = 200) -> httpx.Response:
