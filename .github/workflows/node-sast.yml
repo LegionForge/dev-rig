@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v7
 
       # semgrep is a Python tool — install via pip on a fixed Python version
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
