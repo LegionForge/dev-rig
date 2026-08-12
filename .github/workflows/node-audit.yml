@@ -13,6 +13,13 @@
 
 name: Dependency Audit (Node)
 
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-rig-node-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_call:
     inputs:
@@ -36,10 +43,15 @@ jobs:
   audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
@@ -48,11 +60,18 @@ jobs:
         run: npm ci
 
       - name: npm audit (CVE scan)
-        run: npm audit --audit-level=${{ inputs.audit-level }}
+        env:
+          AUDIT_LEVEL: ${{ inputs.audit-level }}
+        run: |
+          [[ "$AUDIT_LEVEL" =~ ^(critical|high|moderate|low|info)$ ]] || { echo "Invalid audit level"; exit 2; }
+          npm audit --audit-level="$AUDIT_LEVEL"
 
       - name: License compliance
+        env:
+          LICENSE_ALLOWLIST: ${{ inputs.license-allowlist }}
         run: |
+          [[ "$LICENSE_ALLOWLIST" =~ ^[A-Za-z0-9_.+;-]+$ ]] || { echo "Invalid license allowlist"; exit 2; }
           npx license-checker \
-            --onlyAllow "${{ inputs.license-allowlist }}" \
+            --onlyAllow "$LICENSE_ALLOWLIST" \
             --excludePrivatePackages \
             --summary

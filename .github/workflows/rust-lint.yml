@@ -1,38 +1,28 @@
-# Reusable workflow: cargo fmt --check + clippy
-# Caller syntax:
-#
-#   jobs:
-#     lint:
-#       uses: LegionForge/dev-rig/.github/workflows/rust-lint.yml@main
-
 name: Rust Lint
 
 on:
   workflow_call:
     inputs:
-      rust-version:
-        description: "Rust toolchain version (stable, nightly, or specific like 1.78)"
-        required: false
-        type: string
-        default: "stable"
+      rust-version: {type: string, required: false, default: stable}
+
+permissions: {contents: read}
+
+concurrency:
+  group: dev-rig-rust-lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   rust-lint:
     name: Rust Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with: {persist-credentials: false}
+      # zizmor: ignore[superfluous-actions] — selects caller toolchain
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772  # master
         with:
           toolchain: ${{ inputs.rust-version }}
           components: rustfmt, clippy
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: cargo fmt --check
-        run: cargo fmt --all -- --check
-
-      - name: cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings

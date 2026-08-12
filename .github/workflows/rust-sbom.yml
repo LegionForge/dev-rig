@@ -1,56 +1,29 @@
-# Reusable workflow: SBOM generation — CycloneDX JSON (Rust/Cargo)
-# (OWASP SAMM — Implementation/Secure Build)
-#
-# Produces a CycloneDX JSON SBOM from Cargo dependencies and uploads it
-# as a build artifact retained for 90 days.
-#
-# Caller syntax:
-#
-#   jobs:
-#     sbom:
-#       uses: LegionForge/dev-rig/.github/workflows/rust-sbom.yml@main
-
 name: SBOM (Rust)
 
-on:
-  workflow_call:
+on: {workflow_call: {}}
+
+permissions: {contents: read}
+
+concurrency:
+  group: dev-rig-rust-sbom-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   sbom:
     name: Generate SBOM (Rust)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with: {persist-credentials: false}
+      # zizmor: ignore[superfluous-actions] — selects caller toolchain
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772  # master
       - name: Install cargo-cyclonedx
         run: cargo install cargo-cyclonedx --locked
-
-      - name: Generate SBOM (CycloneDX JSON)
-        run: |
-          cargo cyclonedx --format json
-          echo "=== SBOM summary ==="
-          SBOM=$(ls *.cdx.json 2>/dev/null | head -1)
-          if [ -n "$SBOM" ]; then
-            python3 -c "
-          import json, sys
-          data = json.load(open('$SBOM'))
-          comps = data.get('components', [])
-          print(f'{len(comps)} components')
-          for c in comps[:10]:
-              print(f'  {c[\"name\"]}=={c.get(\"version\",\"?\")}')
-          if len(comps) > 10:
-              print(f'  ... and {len(comps)-10} more')
-          "
-          fi
-
-      - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v7
+      - run: cargo cyclonedx --format json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: sbom-cyclonedx-rust
           path: "*.cdx.json"
-          retention-days: 90
+          if-no-files-found: error
+          retention-days: 30

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "legionforge-dev-rig"
-version = "0.1.0"
+version = "0.2.0"
 description = "Shared CI/CD pipeline, pre-commit hooks, and test fixtures for LegionForge projects"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,6 +25,7 @@ analysis = [
     "mypy>=1.10",
     "pip-audit>=2.7",
     "semgrep>=1.70",
+    "zizmor>=1.26,<2",
     "pre-commit>=3.7",
     "types-PyYAML",
 ]
@@ -43,6 +44,7 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["src"]
 
 [tool.ruff]
 target-version = "py311"

@@ -10,6 +10,13 @@
 
 name: Lint & Type Check
 
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-rig-lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_call:
     inputs:
@@ -17,6 +24,11 @@ on:
         description: "Space-separated source directories to analyse"
         required: true
         type: string
+      test-dirs:
+        description: "Space-separated test directories to analyse"
+        required: false
+        type: string
+        default: ""
       python-version:
         description: "Python version to use"
         required: false
@@ -32,22 +44,45 @@ jobs:
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v7
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: ${{ inputs.python-version }}
           cache: pip
 
       - name: Install dev dependencies
-        run: pip install -e ".[dev]" ${{ inputs.extra-mypy-deps }}
+        env:
+          EXTRA_MYPY_DEPS: ${{ inputs.extra-mypy-deps }}
+        run: |
+          read -r -a deps <<< "$EXTRA_MYPY_DEPS"
+          python -m pip install -e ".[dev]" "${deps[@]}"
 
       - name: Ruff
-        run: python -m ruff check ${{ inputs.source-dirs }}
+        env:
+          SOURCE_DIRS: ${{ inputs.source-dirs }}
+          TEST_DIRS: ${{ inputs.test-dirs }}
+        run: |
+          read -r -a source_dirs <<< "$SOURCE_DIRS"
+          read -r -a test_dirs <<< "$TEST_DIRS"
+          python -m ruff check "${source_dirs[@]}" "${test_dirs[@]}"
 
       - name: Bandit
-        run: python -m bandit -r ${{ inputs.source-dirs }} -c pyproject.toml
+        env:
+          SOURCE_DIRS: ${{ inputs.source-dirs }}
+        run: |
+          read -r -a source_dirs <<< "$SOURCE_DIRS"
+          python -m bandit -r "${source_dirs[@]}" -c pyproject.toml
 
       - name: mypy
-        run: python -m mypy ${{ inputs.source-dirs }}
+        env:
+          SOURCE_DIRS: ${{ inputs.source-dirs }}
+        run: |
+          read -r -a source_dirs <<< "$SOURCE_DIRS"
+          python -m mypy "${source_dirs[@]}"

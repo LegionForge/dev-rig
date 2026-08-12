@@ -1,7 +1,13 @@
 # LegionForge dev-rig
 
 Shared CI pipeline, pre-commit hooks, and test fixtures for LegionForge projects.
-Supports Python and Node/TypeScript. Rust and C planned.
+Supports Python, Node/TypeScript, and Rust. C is planned.
+
+The rig itself is continuously audited. Its control audit checks workflow
+permissions, timeouts, concurrency, SHA-pinned actions, checkout credential
+persistence, reusable-workflow input injection, dependency lockfiles, and
+scanner failure policy. The audit is intentionally complementary to
+pip-audit, npm audit, cargo-audit, Semgrep, CodeQL, Trivy, ZAP, and gitleaks.
 
 ---
 
@@ -32,6 +38,10 @@ Supports Python and Node/TypeScript. Rust and C planned.
 | Path | Purpose |
 |---|---|
 | `.github/workflows/secrets.yml` | gitleaks secret scanning — works for any language |
+| `.github/workflows/dast.yml` | ZAP baseline scan with JSON validation and SARIF conversion |
+| `.github/workflows/trivy.yml` | filesystem and optional built-image scan |
+| `.github/workflows/oss-audit.yml` | dev-rig control-plane audit and scheduled drift check |
+| `.github/workflows/attest.yml` | reusable artifact provenance attestation |
 
 ### Other
 
@@ -43,6 +53,7 @@ Supports Python and Node/TypeScript. Rust and C planned.
 | `.pre-commit-hooks.yaml` | Hook definitions consumed via pre-commit |
 | `.pre-commit-config.yaml` | Default config to copy into new projects (includes gitleaks, shellcheck, osv-scanner) |
 | `SECURITY.md` | Vulnerability disclosure policy template — copy and adjust |
+| `EXTERNAL-REVIEW.md` | Control inventory, evidence commands, and review boundaries |
 | `src/legionforge_dev_rig/fixtures/` | Shared pytest fixtures (httpx mocking, etc.) |
 | `examples/` | Template conftest.py and example tests |
 
@@ -226,6 +237,23 @@ To pull the latest hooks in all projects at once:
 ```bash
 pre-commit autoupdate
 ```
+
+### External review checklist
+
+Before requesting review, run:
+
+```bash
+python -m pytest -q
+python -m legionforge_dev_rig.oss_risk_audit . --strict
+zizmor .github/workflows --pedantic
+shellcheck scripts/audit.sh
+```
+
+Reviewers should also confirm that the consuming repository pins the dev-rig
+workflow to a release tag or commit SHA, enables required status checks, and
+has GitHub Dependabot alerts, secret scanning, code scanning, and dependency
+review enabled. Release artifacts should be verified with `gh attestation
+verify` after publishing.
 
 ---
 

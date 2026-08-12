@@ -1,74 +1,81 @@
-# Reusable workflow: Trivy vulnerability + IaC misconfiguration scan
-#
-# Scans the repository filesystem for:
-#   - OS/language package vulnerabilities
-#   - Dockerfile and docker-compose misconfigurations
-#   - Exposed secrets
-#
-# Results are uploaded to the GitHub Security tab as SARIF.
-#
-# Caller syntax:
-#
-#   jobs:
-#     trivy:
-#       uses: LegionForge/dev-rig/.github/workflows/trivy.yml@main
-#       permissions:
-#         security-events: write
-#         contents: read
+# Reusable workflow: Trivy filesystem vulnerability, misconfiguration, and secret scan.
 
 name: Trivy Security Scan
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-rig-trivy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   workflow_call:
     inputs:
       severity:
-        description: "Comma-separated severity levels to report (CRITICAL,HIGH,MEDIUM,LOW)"
+        description: "Comma-separated severity levels"
         required: false
         type: string
         default: "CRITICAL,HIGH"
       exit-code:
-        description: "Exit code when vulnerabilities found: 0 = report only, 1 = fail build"
+        description: "Exit code when findings are detected"
         required: false
         type: string
-        default: "0"
-      trivy-version:
-        description: "aquasecurity/trivy-action version tag"
+        default: "1"
+      image:
+        description: "Optional built image to scan after filesystem scan"
         required: false
         type: string
-        default: "master"
+        default: ""
 
 jobs:
   trivy:
     name: Trivy Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
-      security-events: write
       contents: read
+      # Required only to publish the Trivy SARIF report.
+      security-events: write # zizmor: ignore[undocumented-permissions] — uploads Trivy SARIF
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@8bd2f9fbda2109502356ff8a6a89da55b1ead252  # v0.9.1
         with:
           scan-type: fs
-          scan-ref: "."
+          scan-ref: .
           format: sarif
           output: trivy-results.sarif
           severity: ${{ inputs.severity }}
           exit-code: ${{ inputs.exit-code }}
           scanners: vuln,misconfig,secret
 
-      - name: Upload Trivy SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
+      - name: Scan built container image
+        if: inputs.image != ''
+        uses: aquasecurity/trivy-action@8bd2f9fbda2109502356ff8a6a89da55b1ead252  # v0.9.1
+        with:
+          scan-type: image
+          image-ref: ${{ inputs.image }}
+          format: table
+          severity: ${{ inputs.severity }}
+          exit-code: ${{ inputs.exit-code }}
+          scanners: vuln,misconfig,secret
+
+      - name: Upload Trivy SARIF
         if: always() && hashFiles('trivy-results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@c3400c2f38909e0dcf3c3a41f2030a8217be5d3e  # v3
         with:
           sarif_file: trivy-results.sarif
           category: trivy-fs
 
-      - name: Upload Trivy report artifact
-        uses: actions/upload-artifact@v7
+      - name: Upload Trivy report
         if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: trivy-report
           path: trivy-results.sarif
-          retention-days: 90
+          if-no-files-found: error
+          retention-days: 30

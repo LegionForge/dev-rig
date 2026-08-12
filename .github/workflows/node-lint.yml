@@ -19,6 +19,13 @@
 
 name: Lint & Type Check (Node)
 
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-rig-node-lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_call:
     inputs:
@@ -42,10 +49,15 @@ jobs:
   lint:
     name: Lint & Type Check
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
         with:
           node-version: ${{ inputs.node-version }}
           cache: npm
@@ -54,14 +66,21 @@ jobs:
         run: npm ci
 
       - name: TypeScript type check
-        run: npm run ${{ inputs.typecheck-script }}
+        env:
+          TYPECHECK_SCRIPT: ${{ inputs.typecheck-script }}
+        run: |
+          [[ "$TYPECHECK_SCRIPT" =~ ^[A-Za-z0-9:_-]+$ ]] || { echo "Invalid typecheck script"; exit 2; }
+          npm run "$TYPECHECK_SCRIPT"
 
       - name: ESLint
         # Skip gracefully if eslint is not configured in this project
+        env:
+          SOURCE_DIRS: ${{ inputs.source-dirs }}
         run: |
           if [ -f eslint.config.js ] || [ -f eslint.config.mjs ] || [ -f eslint.config.cjs ] || \
              [ -f .eslintrc.js ] || [ -f .eslintrc.cjs ] || [ -f .eslintrc.json ] || [ -f .eslintrc.yml ]; then
-            npx eslint ${{ inputs.source-dirs }}
+            read -r -a source_dirs <<< "$SOURCE_DIRS"
+            npx eslint "${source_dirs[@]}"
           else
             echo "No ESLint config found — skipping. Add eslint.config.js to enable linting."
           fi

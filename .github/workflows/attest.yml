@@ -1,0 +1,30 @@
+name: Artifact Attestation
+
+on:
+  workflow_call:
+    inputs:
+      subject-path:
+        description: "Glob/path to the release artifact to attest"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-rig-attest-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  attest:
+    name: Attest artifact provenance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # zizmor: ignore[undocumented-permissions] — Sigstore OIDC identity
+      attestations: write # zizmor: ignore[undocumented-permissions] — signed provenance storage
+    steps:
+      - uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661  # v3
+        with:
+          subject-path: ${{ inputs.subject-path }}

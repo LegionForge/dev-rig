@@ -42,7 +42,9 @@ def mock_http_client(respx_mock_base_url: respx.MockRouter) -> httpx.AsyncClient
             provider = OllamaProvider(client=mock_http_client)
             assert await provider.health_check() is True
     """
-    return httpx.AsyncClient()
+    return httpx.AsyncClient(
+        transport=httpx.MockTransport(respx_mock_base_url.async_handler)
+    )
 
 
 def json_response(data: dict[str, Any], status: int = 200) -> httpx.Response:

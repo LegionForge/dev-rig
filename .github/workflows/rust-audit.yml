@@ -1,42 +1,40 @@
-# Reusable workflow: cargo audit (CVE scan via RustSec Advisory Database)
-# Caller syntax:
-#
-#   jobs:
-#     audit:
-#       uses: LegionForge/dev-rig/.github/workflows/rust-audit.yml@main
-#       with:
-#         ignore-advisories: "RUSTSEC-2026-1234 RUSTSEC-2026-5678"   # optional
-
 name: Rust Dependency Audit
 
 on:
   workflow_call:
     inputs:
       ignore-advisories:
-        description: "Space-separated RustSec advisory IDs to suppress"
-        required: false
         type: string
+        required: false
         default: ""
+
+concurrency:
+  group: dev-rig-rust-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   cargo-audit:
-    name: Cargo Audit (CVE scan)
+    name: Cargo Audit (RustSec)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with: {persist-credentials: false}
+      # zizmor: ignore[superfluous-actions] — selects caller toolchain
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772  # master
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
-
-      - name: cargo audit
+      - name: Audit dependencies
+        env:
+          IGNORE_ADVISORIES: ${{ inputs.ignore-advisories }}
         run: |
-          IGNORE_FLAGS=""
-          for id in ${{ inputs.ignore-advisories }}; do
-            IGNORE_FLAGS="$IGNORE_FLAGS --ignore $id"
+          read -r -a advisories <<< "$IGNORE_ADVISORIES"
+          flags=()
+          for id in "${advisories[@]}"; do
+            [[ "$id" =~ ^RUSTSEC-[0-9]{4}-[0-9]{4}$ ]] || { echo "Invalid RustSec ID"; exit 2; }
+            flags+=(--ignore "$id")
           done
-          cargo audit $IGNORE_FLAGS
+          cargo audit "${flags[@]}"

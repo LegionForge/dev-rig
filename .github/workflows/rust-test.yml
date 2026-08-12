@@ -1,34 +1,26 @@
-# Reusable workflow: cargo test
-# Caller syntax:
-#
-#   jobs:
-#     test:
-#       uses: LegionForge/dev-rig/.github/workflows/rust-test.yml@main
-
 name: Rust Tests
 
 on:
   workflow_call:
     inputs:
-      rust-version:
-        description: "Rust toolchain version"
-        required: false
-        type: string
-        default: "stable"
+      rust-version: {type: string, required: false, default: stable}
+
+permissions: {contents: read}
+
+concurrency:
+  group: dev-rig-rust-test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with: {persist-credentials: false}
+      # zizmor: ignore[superfluous-actions] — selects caller toolchain
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772  # master
         with:
           toolchain: ${{ inputs.rust-version }}
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: cargo test
-        run: cargo test --all-features --workspace
+      - run: cargo test --all-features --workspace
