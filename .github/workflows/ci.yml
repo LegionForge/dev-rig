@@ -12,6 +12,13 @@ on:
   push:
     branches: [main]
   pull_request:        # all PRs, regardless of base — so stacked branches self-test too
+  schedule:
+    # Re-run the CVE scanners (audit, supply-chain) and SAST against main's
+    # current, unchanged dependency set daily. A push/PR trigger alone only
+    # catches a vulnerability if someone happens to touch the repo after it's
+    # disclosed -- a newly-published CVE against already-merged code would
+    # otherwise sit invisible indefinitely.
+    - cron: "0 6 * * *"
 
 permissions:
   contents: read
