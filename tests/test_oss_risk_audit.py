@@ -74,6 +74,29 @@ jobs:
     assert not any(f.risk == "unpinned-action" for f in result.findings)
 
 
+def test_reusable_workflow_orchestrator_is_not_flagged_for_timeout(tmp_path: Path) -> None:
+    # A job that only calls a reusable workflow (`uses: ./x.yml`, no
+    # `runs-on:`) can't set timeout-minutes itself -- GitHub Actions rejects
+    # that key there. Nothing runs directly on this file's own runner, so it
+    # shouldn't be flagged for missing a timeout.
+    root = _write_project(
+        tmp_path,
+        """name: CI (self-test)
+permissions:
+  contents: read
+concurrency: {group: ci, cancel-in-progress: true}
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+    with:
+      source-dirs: "pkg"
+""",
+    )
+    result = run_all_checks(root)
+    risks = {f.risk for f in result.findings}
+    assert "workflow-timeout" not in risks
+
+
 def test_json_output_shape_is_serializable(tmp_path: Path) -> None:
     root = _write_project(tmp_path, "name: CI\n")
     result = run_all_checks(root)

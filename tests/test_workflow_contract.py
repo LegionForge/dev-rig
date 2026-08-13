@@ -24,7 +24,12 @@ def test_workflows_have_bounded_least_privilege_jobs() -> None:
     for path in WORKFLOWS.glob("*.yml"):
         text = path.read_text()
         assert "permissions:" in text, path
-        assert "timeout-minutes:" in text, path
+        # A job that only calls a reusable workflow (`uses: ./x.yml`, no
+        # `runs-on:`) can't set timeout-minutes itself -- GitHub Actions
+        # rejects that key there. Nothing runs directly on such a file's own
+        # runner, so it has no timeout to bound.
+        if "runs-on:" in text:
+            assert "timeout-minutes:" in text, path
 
 
 def test_no_direct_workflow_input_shell_interpolation() -> None:
