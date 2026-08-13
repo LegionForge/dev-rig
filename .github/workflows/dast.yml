@@ -104,7 +104,7 @@ jobs:
 
       - name: Upload ZAP SARIF
         if: always() && hashFiles('zap-report.sarif') != ''
-        uses: github/codeql-action/upload-sarif@c3400c2f38909e0dcf3c3a41f2030a8217be5d3e  # v3
+        uses: github/codeql-action/upload-sarif@c4dd10e44af883a891fe31ced449bcb4a6728b9b  # v3
         with:
           sarif_file: zap-report.sarif
           category: owasp-zap
