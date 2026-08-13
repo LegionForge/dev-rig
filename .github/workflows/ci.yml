@@ -42,8 +42,11 @@ jobs:
       # Job-level `permissions:` fully replaces the workflow-level default
       # for this job rather than adding to it, so `contents: read` must be
       # repeated here -- sast.yml's own jobs check out the repo and need it.
+      # `actions: read` is for sast.yml's nested `codeql` job, which needs it
+      # for CodeQL's workflow-run API integration.
       contents: read
       security-events: write
+      actions: read
 
   audit:
     uses: ./.github/workflows/audit.yml

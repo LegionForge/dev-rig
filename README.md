@@ -126,6 +126,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read       # required by the nested codeql job
 
   audit:
     uses: LegionForge/dev-rig/.github/workflows/audit.yml@main
@@ -222,6 +223,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read       # required by the nested codeql job
 
   audit:
     uses: LegionForge/dev-rig/.github/workflows/node-audit.yml@main
@@ -372,6 +374,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
+      actions: read       # required by the nested codeql job
 
   audit:
     uses: LegionForge/dev-rig/.github/workflows/audit.yml@main
