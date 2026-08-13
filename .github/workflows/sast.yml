@@ -7,7 +7,9 @@
 #       with:
 #         source-dirs: "my_package/"
 #       permissions:
+#         contents: read
 #         security-events: write
+#         actions: read       # required by the nested codeql job
 
 name: SAST
 
@@ -87,7 +89,12 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@c3400c2f38909e0dcf3c3a41f2030a8217be5d3e  # v3
         with:
-          languages: python
+          # `actions` analyzes the workflow YAML itself (e.g. script-injection
+          # via untrusted inputs) -- distinct from python source analysis, and
+          # from what oss_risk_audit.py / zizmor check via regex heuristics.
+          # The org's CodeQL default setup covered this before it was
+          # disabled in favor of this advanced config; keep the coverage.
+          languages: python, actions
           queries: security-extended
 
       - name: Autobuild

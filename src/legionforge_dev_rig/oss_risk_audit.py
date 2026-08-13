@@ -80,7 +80,12 @@ def _workflow_checks(root: Path, findings: list[Finding]) -> dict[str, int]:
                 root,
                 "Workflow has no explicit least-privilege permissions block.",
             )
-        if "timeout-minutes:" not in text:
+        # Jobs that call a reusable workflow (`uses: ./x.yml` with no
+        # `runs-on:`) can't set timeout-minutes themselves -- GitHub Actions
+        # rejects that key there. Timeout enforcement lives in the called
+        # workflow's own jobs, so a pure-orchestrator file (no runs-on:
+        # anywhere) has nothing on this runner that could hang.
+        if "runs-on:" in text and "timeout-minutes:" not in text:
             _add(
                 findings,
                 Severity.MEDIUM,
@@ -218,16 +223,9 @@ def _artifact_checks(root: Path, findings: list[Finding]) -> dict[str, int]:
     workflow_text = "\n".join(
         p.read_text(encoding="utf-8", errors="replace") for p in workflow_paths
     )
-    release_paths = [
-        p for p in workflow_paths if re.search(r"(publish|release|build)", p.name)
-    ]
-    release_text = "\n".join(
-        p.read_text(encoding="utf-8", errors="replace") for p in release_paths
-    )
-    if (
-        "upload-artifact" in release_text
-        and "attest-build-provenance" not in release_text
-    ):
+    release_paths = [p for p in workflow_paths if re.search(r"(publish|release|build)", p.name)]
+    release_text = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in release_paths)
+    if "upload-artifact" in release_text and "attest-build-provenance" not in release_text:
         _add(
             findings,
             Severity.MEDIUM,
@@ -247,16 +245,12 @@ def _artifact_checks(root: Path, findings: list[Finding]) -> dict[str, int]:
         )
     return {
         "artifact_uploads": workflow_text.count("upload-artifact"),
-        "provenance_attestation_configured": int(
-            "attest-build-provenance" in workflow_text
-        ),
+        "provenance_attestation_configured": int("attest-build-provenance" in workflow_text),
         "trivy_present": int("trivy-action" in workflow_text),
     }
 
 
-def run_all_checks(
-    project_path: Path, config: dict[str, Any] | None = None
-) -> AuditResult:
+def run_all_checks(project_path: Path, config: dict[str, Any] | None = None) -> AuditResult:
     """Run deterministic repository control checks."""
     root = project_path.resolve()
     findings: list[Finding] = []
@@ -278,42 +272,30 @@ def _format_text_output(result: AuditResult, strict: bool = False) -> str:
     lines.extend(f"{key}: {value}" for key, value in result.inventory.items())
     lines.append("\n=== Findings ===")
     lines.extend(
-        f"[{f.severity.value}] {f.risk}: {f.file}"
-        f"{f':{f.line}' if f.line else ''} — {f.message}"
+        f"[{f.severity.value}] {f.risk}: {f.file}" f"{f':{f.line}' if f.line else ''} — {f.message}"
         for f in result.findings
     )
     if not result.findings:
         lines.append("None")
     counts = {
-        severity: sum(f.severity == severity for f in result.findings)
-        for severity in Severity
+        severity: sum(f.severity == severity for f in result.findings) for severity in Severity
     }
     lines.append(
         f"\nSummary: {counts[Severity.HIGH]} HIGH, "
         f"{counts[Severity.MEDIUM]} MEDIUM, {counts[Severity.LOW]} LOW"
     )
     lines.append(
-        "FAIL"
-        if counts[Severity.HIGH] or (strict and counts[Severity.MEDIUM])
-        else "PASS"
+        "FAIL" if counts[Severity.HIGH] or (strict and counts[Severity.MEDIUM]) else "PASS"
     )
     return "\n".join(lines)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Audit a project for OSS supply-chain risks."
-    )
+    parser = argparse.ArgumentParser(description="Audit a project for OSS supply-chain risks.")
     parser.add_argument("project_path", type=Path)
-    parser.add_argument(
-        "--strict", action="store_true", help="Treat MEDIUM findings as failures"
-    )
-    parser.add_argument(
-        "--json", action="store_true", help="Output machine-readable JSON"
-    )
-    parser.add_argument(
-        "--config", type=Path, help="JSON config containing ignore-risks"
-    )
+    parser.add_argument("--strict", action="store_true", help="Treat MEDIUM findings as failures")
+    parser.add_argument("--json", action="store_true", help="Output machine-readable JSON")
+    parser.add_argument("--config", type=Path, help="JSON config containing ignore-risks")
     args = parser.parse_args()
     try:
         config = json.loads(args.config.read_text()) if args.config else {}
@@ -337,8 +319,7 @@ def main() -> int:
         print(_format_text_output(result, strict=args.strict))
     return int(
         any(
-            f.severity == Severity.HIGH
-            or (args.strict and f.severity == Severity.MEDIUM)
+            f.severity == Severity.HIGH or (args.strict and f.severity == Severity.MEDIUM)
             for f in result.findings
         )
     )

@@ -12,6 +12,13 @@ on:
   push:
     branches: [main]
   pull_request:        # all PRs, regardless of base — so stacked branches self-test too
+  schedule:
+    # Re-run the CVE scanners (audit, supply-chain) and SAST against main's
+    # current, unchanged dependency set daily. A push/PR trigger alone only
+    # catches a vulnerability if someone happens to touch the repo after it's
+    # disclosed -- a newly-published CVE against already-merged code would
+    # otherwise sit invisible indefinitely.
+    - cron: "0 6 * * *"
 
 permissions:
   contents: read
@@ -23,34 +30,36 @@ concurrency:
 jobs:
   lint:
     uses: ./.github/workflows/lint.yml
-    timeout-minutes: 15
     with:
       source-dirs: "src/legionforge_dev_rig"
       extra-mypy-deps: "types-PyYAML httpx respx pytest"
 
   test:
     uses: ./.github/workflows/test.yml
-    timeout-minutes: 15
     with:
       coverage-source: "legionforge_dev_rig"
       coverage-threshold: 80
 
   sast:
     uses: ./.github/workflows/sast.yml
-    timeout-minutes: 20
     with:
       source-dirs: "src/legionforge_dev_rig"
       semgrep-configs: "p/python"
     permissions:
+      # Job-level `permissions:` fully replaces the workflow-level default
+      # for this job rather than adding to it, so `contents: read` must be
+      # repeated here -- sast.yml's own jobs check out the repo and need it.
+      # `actions: read` is for sast.yml's nested `codeql` job, which needs it
+      # for CodeQL's workflow-run API integration.
+      contents: read
       security-events: write
+      actions: read
 
   audit:
     uses: ./.github/workflows/audit.yml
-    timeout-minutes: 15
 
   supply-chain:
     uses: ./.github/workflows/supply-chain.yml
-    timeout-minutes: 20
     with:
       # Pull the risky-exec ruleset from THIS branch so self-CI tests the PR's
       # rules, not whatever is on main.
@@ -59,8 +68,6 @@ jobs:
 
   secrets:
     uses: ./.github/workflows/secrets.yml
-    timeout-minutes: 10
 
   sbom:
     uses: ./.github/workflows/sbom.yml
-    timeout-minutes: 15
