@@ -87,7 +87,7 @@ jobs:
           persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@c3400c2f38909e0dcf3c3a41f2030a8217be5d3e  # v3
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3  # v3
         with:
           # `actions` analyzes the workflow YAML itself (e.g. script-injection
           # via untrusted inputs) -- distinct from python source analysis, and
