@@ -90,7 +90,12 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@24c7eb380a2dc368f2d129e4c65e51d172983a1e  # v4
         with:
-          languages: javascript-typescript
+          # `actions` analyzes the workflow YAML itself (e.g. script-injection
+          # via untrusted inputs) -- distinct from source analysis, and from
+          # what oss_risk_audit.py / zizmor check via regex heuristics. The
+          # org's CodeQL default setup covered this before it was disabled in
+          # favor of this advanced config; keep the coverage.
+          languages: javascript-typescript, actions
           queries: security-extended
 
       - name: Autobuild
