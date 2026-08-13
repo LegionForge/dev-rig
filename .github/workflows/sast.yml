@@ -7,6 +7,7 @@
 #       with:
 #         source-dirs: "my_package/"
 #       permissions:
+#         contents: read
 #         security-events: write
 
 name: SAST

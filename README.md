@@ -124,6 +124,7 @@ jobs:
     with:
       source-dirs: "my_package/"
     permissions:
+      contents: read
       security-events: write
 
   audit:
@@ -136,6 +137,12 @@ jobs:
   secrets:
     uses: LegionForge/dev-rig/.github/workflows/secrets.yml@main
 ```
+
+> **Lockfile note.** `lint.yml` and `test.yml` install dependencies with
+> `uv sync --extra dev`, which honors a committed `uv.lock` when one exists —
+> CI then installs exactly what's locked and tested locally instead of
+> whatever's newest on PyPI. Run `uv lock` and commit the result to opt in;
+> repos without a `uv.lock` still resolve fresh on every run, same as before.
 
 > **Multi-language note.** `supply-chain.yml` and the local `audit.sh`/`audit.ps1`
 > harness cover Python, JS/TS, and Rust (via osv-scanner lockfile scanning) plus
@@ -213,6 +220,7 @@ jobs:
     with:
       source-dirs: "src"
     permissions:
+      contents: read
       security-events: write
 
   audit:
@@ -362,6 +370,7 @@ jobs:
     with:
       source-dirs: "src"
     permissions:
+      contents: read
       security-events: write
 
   audit:
@@ -377,6 +386,7 @@ jobs:
       target-url: "http://localhost:9766"
       fail-on-severity: "High"
     permissions:
+      contents: read
       security-events: write
 ```
 

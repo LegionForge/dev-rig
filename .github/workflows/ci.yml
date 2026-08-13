@@ -39,6 +39,10 @@ jobs:
       source-dirs: "src/legionforge_dev_rig"
       semgrep-configs: "p/python"
     permissions:
+      # Job-level `permissions:` fully replaces the workflow-level default
+      # for this job rather than adding to it, so `contents: read` must be
+      # repeated here -- sast.yml's own jobs check out the repo and need it.
+      contents: read
       security-events: write
 
   audit:
