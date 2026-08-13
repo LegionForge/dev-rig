@@ -52,17 +52,25 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6
+      - uses: astral-sh/setup-uv@ae62891fec2bb8e7d6c99fc78c9fec3a63790f8d  # v10
         with:
           python-version: ${{ inputs.python-version }}
-          cache: pip
+          enable-cache: true
 
       - name: Install dev dependencies
+        # `uv sync` resolves against this repo's own uv.lock when one is
+        # committed, so CI installs exactly what was locked/tested locally
+        # instead of silently picking up whatever is newest on PyPI. Repos
+        # without a committed lock still resolve fresh, same as before.
+        run: uv sync --extra dev
+
+      - name: Install extra packages
         env:
           EXTRA_DEPS: ${{ inputs.extra-deps }}
+        if: ${{ inputs.extra-deps != '' }}
         run: |
           read -r -a deps <<< "$EXTRA_DEPS"
-          python -m pip install -e ".[dev]" "${deps[@]}"
+          uv pip install "${deps[@]}"
 
       - name: pytest with coverage
         env:
@@ -71,7 +79,7 @@ jobs:
         run: |
           [[ "$COVERAGE_SOURCE" =~ ^[A-Za-z0-9_./-]+$ ]] || { echo "Invalid coverage source"; exit 2; }
           [[ "$COVERAGE_THRESHOLD" =~ ^[0-9]+$ ]] || { echo "Invalid coverage threshold"; exit 2; }
-          python -m pytest \
+          uv run pytest \
             --cov="$COVERAGE_SOURCE" \
             --cov-report=term-missing \
             --cov-report=xml \
