@@ -1,13 +1,17 @@
-# Reusable workflow: SAST — semgrep + CodeQL (Node/TypeScript)
+# Reusable workflow: SAST — semgrep + CodeQL (Rust)
 #
-# semgrep: scans JS/TS source with p/javascript, p/typescript, p/nodejs rulesets.
+# semgrep: scans Rust source with p/rust ruleset (audit-oriented, may
+#          produce false positives -- override via semgrep-configs if noisy).
 # CodeQL:  GitHub's semantic analysis engine with security-extended queries.
+#          Rust support is GA in CodeQL as of this writing; unlike
+#          interpreted languages, the codeql database build compiles the
+#          crate, so Autobuild needs a working `cargo build` in the repo.
 #
 # Caller syntax:
 #
 #   jobs:
 #     sast:
-#       uses: LegionForge/dev-rig/.github/workflows/node-sast.yml@main
+#       uses: LegionForge/dev-rig/.github/workflows/rust-sast.yml@main
 #       with:
 #         source-dirs: "src"
 #       permissions:
@@ -15,13 +19,13 @@
 #         security-events: write
 #         actions: read       # required by the nested codeql job
 
-name: SAST (Node)
+name: SAST (Rust)
 
 permissions:
   contents: read
 
 concurrency:
-  group: dev-rig-node-sast-${{ github.workflow }}-${{ github.ref }}
+  group: dev-rig-rust-sast-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 on:
@@ -29,14 +33,13 @@ on:
     inputs:
       source-dirs:
         description: "Space-separated source directories for semgrep"
-        required: false
+        required: true
         type: string
-        default: "src"
       semgrep-configs:
         description: "Space-separated semgrep config targets"
         required: false
         type: string
-        default: "p/javascript p/typescript p/nodejs"
+        default: "p/rust"
 
 jobs:
   semgrep:
@@ -50,7 +53,6 @@ jobs:
         with:
           persist-credentials: false
 
-      # semgrep is a Python tool — install via pip on a fixed Python version
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: "3.11"
@@ -66,7 +68,7 @@ jobs:
           configs=""
           read -r -a config_names <<< "$SEMGREP_CONFIGS"
           for c in "${config_names[@]}"; do
-            [[ "$c" =~ ^p/[A-Za-z0-9_-]+$ ]] || { echo "Invalid Semgrep config"; exit 2; }
+            [[ "$c" =~ ^p/[A-Za-z0-9_-]+$ ]] || { echo "Invalid Semgrep config: $c"; exit 2; }
             configs="$configs --config=$c"
           done
           read -r -a source_dirs <<< "$SOURCE_DIRS"
@@ -78,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Required for CodeQL SARIF upload.
+      # Required for CodeQL SARIF upload and alert deduplication.
       security-events: write # zizmor: ignore[undocumented-permissions] — uploads CodeQL SARIF
       # Required by CodeQL's workflow-run API integration.
       actions: read # zizmor: ignore[undocumented-permissions] — CodeQL workflow-run API
@@ -95,7 +97,7 @@ jobs:
           # what oss_risk_audit.py / zizmor check via regex heuristics. The
           # org's CodeQL default setup covered this before it was disabled in
           # favor of this advanced config; keep the coverage.
-          languages: javascript-typescript, actions
+          languages: rust, actions
           queries: security-extended
 
       - name: Autobuild
