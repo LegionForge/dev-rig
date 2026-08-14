@@ -63,7 +63,9 @@ ignore = [
 "examples/**" = ["S101"]
 
 [tool.bandit]
-exclude_dirs = [".venv", "venv", ".git", "tests"]
+# Tests and example templates use pytest-style asserts by design; ruff's
+# per-file-ignore (S101) doesn't apply to bandit, which flags them as B101.
+exclude_dirs = [".venv", "venv", ".git", "tests", "examples"]
 skips = [
     "B404",   # subprocess import — shell=False enforced throughout
     "B603",   # subprocess without shell=True
@@ -74,6 +76,11 @@ skips = [
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+# examples/ and tests/ each define their own conftest.py; without __init__.py
+# files, checking both in one mypy run collides ("Duplicate module named
+# conftest"). Examples are copy/adapt templates, not an importable package —
+# exclude them here. Ruff still checks them for syntax/import hygiene.
+exclude = ["^examples/"]
 
 [tool.coverage.report]
 exclude_lines = [

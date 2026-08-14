@@ -5,7 +5,6 @@
 # Copy to your project's tests/unit/ and adapt.
 
 import httpx
-import pytest
 import respx
 
 # from myproject.providers.myservice import MyProvider  # ← uncomment in your project
@@ -27,6 +26,7 @@ class _FakeProvider:
 
 
 # ── Tests using shared fixtures ───────────────────────────────────────────────
+
 
 class TestProviderHealthCheck:
     async def test_healthy_service_returns_true(
