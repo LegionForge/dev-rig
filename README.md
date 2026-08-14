@@ -33,6 +33,16 @@ pip-audit, npm audit, cargo-audit, Semgrep, CodeQL, Trivy, ZAP, and gitleaks.
 | `.github/workflows/node-audit.yml` | npm audit CVE scan + license-checker compliance |
 | `.github/workflows/node-sbom.yml` | CycloneDX SBOM generation |
 
+### Rust
+
+| Path | Purpose |
+|---|---|
+| `.github/workflows/rust-lint.yml` | rustfmt check + clippy (`-D warnings`) |
+| `.github/workflows/rust-test.yml` | cargo test (all features, full workspace) |
+| `.github/workflows/rust-sast.yml` | semgrep (p/rust) + CodeQL |
+| `.github/workflows/rust-audit.yml` | cargo audit CVE scan |
+| `.github/workflows/rust-sbom.yml` | CycloneDX SBOM generation |
+
 ### Language-agnostic
 
 | Path | Purpose |

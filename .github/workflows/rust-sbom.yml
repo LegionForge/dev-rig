@@ -1,6 +1,12 @@
 name: SBOM (Rust)
 
-on: {workflow_call: {}}
+on:
+  workflow_call:
+    inputs:
+      rust-version:
+        type: string
+        required: false
+        default: stable
 
 permissions: {contents: read}
 
@@ -16,8 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
         with: {persist-credentials: false}
-      # zizmor: ignore[superfluous-actions] — selects caller toolchain
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772  # master
+        with:
+          toolchain: ${{ inputs.rust-version }}
       - name: Install cargo-cyclonedx
         run: cargo install cargo-cyclonedx --locked
       - run: cargo cyclonedx --format json
