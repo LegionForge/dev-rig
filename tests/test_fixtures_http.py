@@ -6,7 +6,7 @@ end-to-end against the rig itself (see .github/workflows/ci.yml).
 
 import httpx
 import pytest
-
+import respx
 from legionforge_dev_rig.fixtures import http as fx
 
 
@@ -34,7 +34,7 @@ def test_error_response_without_detail() -> None:
     assert resp.json() == {}
 
 
-def test_respx_fixture_stubs_route(respx_mock_base_url) -> None:
+def test_respx_fixture_stubs_route(respx_mock_base_url: respx.MockRouter) -> None:
     respx_mock_base_url.get("http://svc.local/ping").mock(
         return_value=httpx.Response(200, json={"pong": True})
     )
@@ -46,7 +46,8 @@ def test_respx_fixture_stubs_route(respx_mock_base_url) -> None:
 
 @pytest.mark.asyncio
 async def test_mock_http_client_is_async_and_wired(
-    mock_http_client, respx_mock_base_url
+    mock_http_client: httpx.AsyncClient,
+    respx_mock_base_url: respx.MockRouter,
 ) -> None:
     respx_mock_base_url.get("http://svc.local/health").mock(
         return_value=httpx.Response(200, json={"status": "ok"})
