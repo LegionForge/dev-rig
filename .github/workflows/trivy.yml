@@ -43,7 +43,7 @@ jobs:
           persist-credentials: false
 
       - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@8bd2f9fbda2109502356ff8a6a89da55b1ead252  # v0.9.1
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -55,7 +55,7 @@ jobs:
 
       - name: Scan built container image
         if: inputs.image != ''
-        uses: aquasecurity/trivy-action@8bd2f9fbda2109502356ff8a6a89da55b1ead252  # v0.9.1
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           scan-type: image
           image-ref: ${{ inputs.image }}
