@@ -52,6 +52,51 @@ def _line_number(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
+def _step_block(text: str, pos: int) -> tuple[int, str]:
+    """Return (start_offset, text) of the YAML list-item ("- ...") block
+    that contains `pos`.
+
+    Scoping to the enclosing step (rather than a fixed character window or
+    "next blank line") avoids picking up unrelated sibling steps that happen
+    to share the same blank-line-delimited paragraph, or missing a sibling
+    step separated from the current one by something other than a blank
+    line.
+    """
+    lines = text.splitlines(keepends=True)
+    offsets = []
+    running = 0
+    for line in lines:
+        offsets.append(running)
+        running += len(line)
+    idx = next(
+        (i for i in range(len(lines) - 1, -1, -1) if offsets[i] <= pos),
+        0,
+    )
+
+    start_idx = idx
+    step_indent = None
+    for i in range(idx, -1, -1):
+        stripped = lines[i].lstrip()
+        if stripped.startswith("- "):
+            start_idx = i
+            step_indent = len(lines[i]) - len(stripped)
+            break
+    if step_indent is None:
+        end = text.find("\n\n", pos)
+        return pos, text[pos : end if end >= 0 else len(text)]
+
+    end_idx = len(lines)
+    for i in range(start_idx + 1, len(lines)):
+        stripped = lines[i].strip()
+        if not stripped:
+            continue
+        indent = len(lines[i]) - len(lines[i].lstrip())
+        if indent <= step_indent:
+            end_idx = i
+            break
+    return offsets[start_idx], "".join(lines[start_idx:end_idx])
+
+
 def _add(
     findings: list[Finding],
     severity: Severity,
@@ -129,13 +174,7 @@ def _workflow_checks(root: Path, findings: list[Finding]) -> dict[str, int]:
                 )
         for match in re.finditer(r"uses:\s*actions/checkout@[^\n]+", text):
             line = _line_number(text, match.start())
-            block = text[
-                match.start() : (
-                    text.find("\n\n", match.start())
-                    if text.find("\n\n", match.start()) >= 0
-                    else len(text)
-                )
-            ]
+            _, block = _step_block(text, match.start())
             if "persist-credentials: false" not in block:
                 _add(
                     findings,
@@ -148,7 +187,8 @@ def _workflow_checks(root: Path, findings: list[Finding]) -> dict[str, int]:
                 )
         for match in INPUT_RE.finditer(text):
             line = _line_number(text, match.start())
-            before = text[max(0, match.start() - 300) : match.start()]
+            block_start, block = _step_block(text, match.start())
+            before = block[: match.start() - block_start]
             if "run:" in before and "env:" not in before:
                 input_shell_uses += 1
                 _add(
@@ -214,17 +254,16 @@ def _manifest_checks(root: Path, findings: list[Finding]) -> dict[str, int]:
         )
     return {
         "dependency_manifests": len(manifests),
-        "lockfiles": sum(p.name.endswith("lock") for p in manifests),
+        "lockfiles": sum(p.name in {"package-lock.json", "Cargo.lock"} for p in manifests),
     }
 
 
 def _artifact_checks(root: Path, findings: list[Finding]) -> dict[str, int]:
     workflow_paths = list((root / ".github" / "workflows").glob("*.y*ml"))
-    workflow_text = "\n".join(
-        p.read_text(encoding="utf-8", errors="replace") for p in workflow_paths
-    )
+    workflow_texts = {p: p.read_text(encoding="utf-8", errors="replace") for p in workflow_paths}
+    workflow_text = "\n".join(workflow_texts.values())
     release_paths = [p for p in workflow_paths if re.search(r"(publish|release|build)", p.name)]
-    release_text = "\n".join(p.read_text(encoding="utf-8", errors="replace") for p in release_paths)
+    release_text = "\n".join(workflow_texts[p] for p in release_paths)
     if "upload-artifact" in release_text and "attest-build-provenance" not in release_text:
         _add(
             findings,
