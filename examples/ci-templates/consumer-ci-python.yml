@@ -1,0 +1,55 @@
+# Canonical caller template for a Python repo consuming dev-rig's reusable
+# workflows. Copy this file's jobs verbatim into your own ci.yml, updating
+# only `uses: ...@<ref>` and the `with:` inputs.
+#
+# scripts/check_permission_contract.py checks this file on every dev-rig PR
+# to make sure it still grants at least what each reusable workflow needs --
+# if a change to one of the workflows below raises what it requires, that
+# check fails here, in dev-rig's own CI, before the change ever reaches a
+# real consumer repo.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    uses: LegionForge/dev-rig/.github/workflows/lint.yml@main
+    with:
+      source-dirs: "my_package"
+
+  test:
+    uses: LegionForge/dev-rig/.github/workflows/test.yml@main
+    with:
+      coverage-source: "my_package"
+
+  sast:
+    uses: LegionForge/dev-rig/.github/workflows/sast.yml@main
+    with:
+      source-dirs: "my_package/"
+    permissions:
+      contents: read
+      security-events: write
+      actions: read # required by the nested codeql job
+
+  audit:
+    uses: LegionForge/dev-rig/.github/workflows/audit.yml@main
+
+  secrets:
+    uses: LegionForge/dev-rig/.github/workflows/secrets.yml@main
+
+  sbom:
+    uses: LegionForge/dev-rig/.github/workflows/sbom.yml@main
+
+  trivy:
+    uses: LegionForge/dev-rig/.github/workflows/trivy.yml@main
+    permissions:
+      contents: read
+      security-events: write

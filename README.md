@@ -66,6 +66,7 @@ pip-audit, npm audit, cargo-audit, Semgrep, CodeQL, Trivy, ZAP, and gitleaks.
 | `EXTERNAL-REVIEW.md` | Control inventory, evidence commands, and review boundaries |
 | `src/legionforge_dev_rig/fixtures/` | Shared pytest fixtures (httpx mocking, etc.) |
 | `examples/` | Template conftest.py and example tests |
+| `examples/ci-templates/` | Canonical `ci.yml`/`release.yml` per language, showing the exact `permissions:` each reusable workflow needs — copy these into a new consumer repo rather than hand-writing permissions blocks. Checked by `tests/test_workflow_contract.py` on every dev-rig PR. |
 
 ---
 
