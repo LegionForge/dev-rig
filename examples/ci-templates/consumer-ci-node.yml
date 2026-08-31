@@ -1,0 +1,47 @@
+# Canonical caller template for a Node repo consuming dev-rig's reusable
+# workflows. See consumer-ci-python.yml for the full explanation of why
+# this file exists and is checked by scripts/check_permission_contract.py.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    uses: LegionForge/dev-rig/.github/workflows/node-lint.yml@main
+    with:
+      source-dirs: "src"
+
+  test:
+    uses: LegionForge/dev-rig/.github/workflows/node-test.yml@main
+
+  sast:
+    uses: LegionForge/dev-rig/.github/workflows/node-sast.yml@main
+    with:
+      source-dirs: "src"
+    permissions:
+      contents: read
+      security-events: write
+      actions: read # required by the nested codeql job
+
+  audit:
+    uses: LegionForge/dev-rig/.github/workflows/node-audit.yml@main
+
+  secrets:
+    uses: LegionForge/dev-rig/.github/workflows/secrets.yml@main
+
+  sbom:
+    uses: LegionForge/dev-rig/.github/workflows/node-sbom.yml@main
+
+  trivy:
+    uses: LegionForge/dev-rig/.github/workflows/trivy.yml@main
+    permissions:
+      contents: read
+      security-events: write
