@@ -70,7 +70,8 @@ jobs:
         env:
           LICENSE_ALLOWLIST: ${{ inputs.license-allowlist }}
         run: |
-          [[ "$LICENSE_ALLOWLIST" =~ ^[A-Za-z0-9_.+;-]+$ ]] || { echo "Invalid license allowlist"; exit 2; }
+          allowlist_pattern='^[A-Za-z0-9_.+;-]+$'
+          [[ "$LICENSE_ALLOWLIST" =~ $allowlist_pattern ]] || { echo "Invalid license allowlist"; exit 2; }
           npx license-checker \
             --onlyAllow "$LICENSE_ALLOWLIST" \
             --excludePrivatePackages \
