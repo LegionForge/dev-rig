@@ -1,0 +1,26 @@
+# Canonical caller template for a repo's release/publish workflow and any
+# runtime (DAST) scan, as opposed to the source-level checks in
+# consumer-ci-*.yml. See consumer-ci-python.yml for why this file exists.
+
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  attest:
+    uses: LegionForge/dev-rig/.github/workflows/attest.yml@main
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+  dast:
+    uses: LegionForge/dev-rig/.github/workflows/dast.yml@main
+    permissions:
+      contents: read
+      security-events: write
