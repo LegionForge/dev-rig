@@ -52,6 +52,11 @@ jobs:
           severity: ${{ inputs.severity }}
           exit-code: ${{ inputs.exit-code }}
           scanners: vuln,misconfig,secret
+          # trivy-action's entrypoint silently `unset`s the severity filter
+          # for SARIF output unless this is set -- without it, `severity:`
+          # above is a no-op and EVERY finding (including LOW/UNKNOWN) gates
+          # the job, regardless of the configured threshold.
+          limit-severities-for-sarif: "true"
 
       - name: Scan built container image
         if: inputs.image != ''
